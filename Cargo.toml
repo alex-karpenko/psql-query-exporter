@@ -1,0 +1,26 @@
+[package]
+name = "psql-query-exporter"
+version = "0.1.0"
+edition = "2021"
+authors = ["Oleksii Karpenko <alexkarpenko@yahoo.com>"]
+description = "PostgreSQL Query Prometheus exporter"
+repository = "https://github.com/alex-karpenko/psql-query-exporter"
+license = "MIT OR Apache-2.0"
+keywords = ["postgres", "postgresql", "prometheus", "exporter"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tracing = "0.1.36"
+tracing-subscriber = { version = "0.3.15", features = ["env-filter"] }
+clap = {version = "3.2.22", features = ["derive"]}
+tokio = { version = "1", features = ["full"] }
+warp = "0.3"
+prometheus = "0.13.2"
+tokio-postgres = "0.7.7"
+postgres-native-tls = "0.5.0"
+native-tls = "0.2"
+serde = { version = "1.0", features = ["derive"] }
+humantime-serde = "1.1"
+figment = { version = "0.10.8", features = ["yaml", "env"] }
+regex = "1.6"
