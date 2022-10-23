@@ -59,22 +59,11 @@ helm install psql-query-exporter ./helm/psql-query-exporter -f my-values.yaml
 For example your values can be like below. Don't forget to create secret `psql-query-exporter` with two keys `PG_USER` and `PG_PASSWORD` with username and password to access DB.
 
 ```yaml
-podSecurityContext:
-  fsGroup: 2000
-
-securityContext:
-  capabilities:
-    drop:
-    - ALL
-  readOnlyRootFilesystem: true
-  runAsNonRoot: true
-  runAsUser: 1000
+# info or debug, anything else - warning
+logLevel: info
 
 secrets:
   - psql-query-exporter
-
-# info or debug, anything else - warning
-logLevel: info
 
 config:
   defaults:
@@ -110,16 +99,16 @@ config:
 
 ### Build your own binary
 
-Since exported is written in Rust, you can use standart Rust tools to build binary for any platform you need:
+Since exported is written in Rust, you can use standart Rust tools to build binary for any platform you need. Of cource, you have to have [Rust](https://rust-lang.org) tool-chain installed.
 
 ```console
-cargo install --release --path .
+cargo build --release
 ```
 
-And easy run it:
+And run it:
 
 ```console
-./psql-query-exporter --config ./confg.yaml -v
+target/release/psql-query-exporter --config ./confg.yaml -v
 ```
 
 ## Configuration
