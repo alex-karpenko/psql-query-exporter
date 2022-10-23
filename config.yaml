@@ -1,0 +1,30 @@
+defaults:
+  scrape_interval: 30s
+  query_timeout: 5s
+  ssl_verify: false
+
+sources:
+  postgres:
+    host: localhost
+    port: 5432
+    user: ${PG_USER}
+    password: ${PG_PASSWORD}
+    sslmode: require
+    metric_prefix: postgres_state
+
+    databases:
+      - dbname: postgres
+        queries:
+          - metric_name: replication_lag
+            query: |
+              select slot_name, slot_type, active::text, 
+              (case when not pg_is_in_recovery() then pg_current_wal_lsn() - restart_lsn end)::float as lag_bytes
+              from pg_replication_slots;
+            values:
+              single:
+                field: lag_bytes
+                type: float
+            var_labels:
+              - slot_name
+              - slot_type
+              - active
