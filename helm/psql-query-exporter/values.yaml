@@ -5,7 +5,7 @@
 replicaCount: 1
 
 image:
-  repository: alexkarpenko/psql-query-exporter
+  repository: ghcr.io/alex-karpenko/psql-query-exporter
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
