@@ -357,11 +357,10 @@ impl ScrapeConfigQuery {
                             });
                             opts = opts.const_labels(const_labels);
                         }
-                        let new_metric;
-                        if let Some(var_labels) = &self.var_labels {
+                        let new_metric = if let Some(var_labels) = &self.var_labels {
                             let new_labels: Vec<&str> =
                                 var_labels.iter().map(AsRef::as_ref).collect();
-                            new_metric = match value.field_type {
+                            match value.field_type {
                                 FieldType::Int => MetricWithType::VectorInt(
                                     register_int_gauge_vec!(opts, &new_labels).unwrap_or_else(
                                         |_| {
@@ -382,7 +381,7 @@ impl ScrapeConfigQuery {
                                 ),
                             }
                         } else {
-                            new_metric = match value.field_type {
+                            match value.field_type {
                                 FieldType::Int => MetricWithType::SingleInt(
                                     register_int_gauge!(opts).unwrap_or_else(|_| {
                                         panic!(
@@ -399,8 +398,8 @@ impl ScrapeConfigQuery {
                                         )
                                     }),
                                 ),
-                            };
-                        }
+                            }
+                        };
 
                         self.metric.push(new_metric);
                     }
@@ -415,11 +414,10 @@ impl ScrapeConfigQuery {
                         if let Some(const_labels) = &self.const_labels {
                             opts = opts.const_labels(const_labels.clone());
                         }
-                        let new_metric;
-                        if let Some(var_labels) = &self.var_labels {
+                        let new_metric = if let Some(var_labels) = &self.var_labels {
                             let new_labels: Vec<&str> =
                                 var_labels.iter().map(AsRef::as_ref).collect();
-                            new_metric = match value.field_type {
+                            match value.field_type {
                                 FieldType::Int => MetricWithType::VectorInt(
                                     register_int_gauge_vec!(opts, &new_labels).unwrap_or_else(
                                         |_| {
@@ -434,7 +432,7 @@ impl ScrapeConfigQuery {
                                 ),
                             }
                         } else {
-                            new_metric = match value.field_type {
+                            match value.field_type {
                                 FieldType::Int => MetricWithType::SingleInt(
                                     register_int_gauge!(opts).unwrap_or_else(|_| {
                                         panic!("error while registering metric {}", metric_name)
@@ -445,8 +443,8 @@ impl ScrapeConfigQuery {
                                         panic!("error while registering metric {}", metric_name)
                                     }),
                                 ),
-                            };
-                        }
+                            }
+                        };
 
                         self.metric.push(new_metric);
                     }
