@@ -233,7 +233,7 @@ impl ScrapeConfigSource {
             let env_name = item.get(0).expect("looks like a BUG").as_str().to_string();
             let env_name = env_name.trim_start_matches("${").trim_end_matches('}');
             let env_value = env::var(env_name)
-                .expect(format!("environment variable '{env_name}' expected").as_str());
+                .unwrap_or_else(|_| panic!("environment variable '{env_name}' expected"));
             result = re.replace_all(&result, env_value).to_string();
         }
 
@@ -314,35 +314,31 @@ impl ScrapeConfigQuery {
                         let new_labels: Vec<&str> = var_labels.iter().map(AsRef::as_ref).collect();
                         self.metric = match values.field_type {
                             FieldType::Int => vec![MetricWithType::VectorInt(
-                                register_int_gauge_vec!(opts, &new_labels).expect(
-                                    format!("error while registering metric {}", self.metric_name)
-                                        .as_str(),
-                                ),
+                                register_int_gauge_vec!(opts, &new_labels).unwrap_or_else(|_| {
+                                    panic!("error while registering metric {}", self.metric_name)
+                                }),
                             )],
                             FieldType::Float => vec![MetricWithType::VectorFloat(
-                                register_gauge_vec!(opts, &new_labels).expect(
-                                    format!("error while registering metric {}", self.metric_name)
-                                        .as_str(),
-                                ),
+                                register_gauge_vec!(opts, &new_labels).unwrap_or_else(|_| {
+                                    panic!("error while registering metric {}", self.metric_name)
+                                }),
                             )],
                         }
                     } else {
                         self.metric = match values.field_type {
                             FieldType::Int => vec![MetricWithType::SingleInt(
-                                register_int_gauge!(opts).expect(
-                                    format!("error while registering metric {}", self.metric_name)
-                                        .as_str(),
-                                ),
+                                register_int_gauge!(opts).unwrap_or_else(|_| {
+                                    panic!("error while registering metric {}", self.metric_name)
+                                }),
                             )],
                             FieldType::Float => {
                                 vec![MetricWithType::SingleFloat(
-                                    register_gauge!(opts).expect(
-                                        format!(
+                                    register_gauge!(opts).unwrap_or_else(|_| {
+                                        panic!(
                                             "error while registering metric {}",
                                             self.metric_name
                                         )
-                                        .as_str(),
-                                    ),
+                                    }),
                                 )]
                             }
                         };
@@ -361,52 +357,49 @@ impl ScrapeConfigQuery {
                             });
                             opts = opts.const_labels(const_labels);
                         }
-                        let new_metric;
-                        if let Some(var_labels) = &self.var_labels {
+                        let new_metric = if let Some(var_labels) = &self.var_labels {
                             let new_labels: Vec<&str> =
                                 var_labels.iter().map(AsRef::as_ref).collect();
-                            new_metric = match value.field_type {
+                            match value.field_type {
                                 FieldType::Int => MetricWithType::VectorInt(
-                                    register_int_gauge_vec!(opts, &new_labels).expect(
-                                        format!(
-                                            "error while registering metric {}",
-                                            self.metric_name
-                                        )
-                                        .as_str(),
+                                    register_int_gauge_vec!(opts, &new_labels).unwrap_or_else(
+                                        |_| {
+                                            panic!(
+                                                "error while registering metric {}",
+                                                self.metric_name
+                                            )
+                                        },
                                     ),
                                 ),
                                 FieldType::Float => MetricWithType::VectorFloat(
-                                    register_gauge_vec!(opts, &new_labels).expect(
-                                        format!(
+                                    register_gauge_vec!(opts, &new_labels).unwrap_or_else(|_| {
+                                        panic!(
                                             "error while registering metric {}",
                                             self.metric_name
                                         )
-                                        .as_str(),
-                                    ),
+                                    }),
                                 ),
                             }
                         } else {
-                            new_metric = match value.field_type {
+                            match value.field_type {
                                 FieldType::Int => MetricWithType::SingleInt(
-                                    register_int_gauge!(opts).expect(
-                                        format!(
+                                    register_int_gauge!(opts).unwrap_or_else(|_| {
+                                        panic!(
                                             "error while registering metric {}",
                                             self.metric_name
                                         )
-                                        .as_str(),
-                                    ),
+                                    }),
                                 ),
                                 FieldType::Float => MetricWithType::SingleFloat(
-                                    register_gauge!(opts).expect(
-                                        format!(
+                                    register_gauge!(opts).unwrap_or_else(|_| {
+                                        panic!(
                                             "error while registering metric {}",
                                             self.metric_name
                                         )
-                                        .as_str(),
-                                    ),
+                                    }),
                                 ),
-                            };
-                        }
+                            }
+                        };
 
                         self.metric.push(new_metric);
                     }
@@ -421,40 +414,37 @@ impl ScrapeConfigQuery {
                         if let Some(const_labels) = &self.const_labels {
                             opts = opts.const_labels(const_labels.clone());
                         }
-                        let new_metric;
-                        if let Some(var_labels) = &self.var_labels {
+                        let new_metric = if let Some(var_labels) = &self.var_labels {
                             let new_labels: Vec<&str> =
                                 var_labels.iter().map(AsRef::as_ref).collect();
-                            new_metric = match value.field_type {
+                            match value.field_type {
                                 FieldType::Int => MetricWithType::VectorInt(
-                                    register_int_gauge_vec!(opts, &new_labels).expect(
-                                        format!("error while registering metric {}", metric_name)
-                                            .as_str(),
+                                    register_int_gauge_vec!(opts, &new_labels).unwrap_or_else(
+                                        |_| {
+                                            panic!("error while registering metric {}", metric_name)
+                                        },
                                     ),
                                 ),
                                 FieldType::Float => MetricWithType::VectorFloat(
-                                    register_gauge_vec!(opts, &new_labels).expect(
-                                        format!("error while registering metric {}", metric_name)
-                                            .as_str(),
-                                    ),
+                                    register_gauge_vec!(opts, &new_labels).unwrap_or_else(|_| {
+                                        panic!("error while registering metric {}", metric_name)
+                                    }),
                                 ),
                             }
                         } else {
-                            new_metric = match value.field_type {
+                            match value.field_type {
                                 FieldType::Int => MetricWithType::SingleInt(
-                                    register_int_gauge!(opts).expect(
-                                        format!("error while registering metric {}", metric_name)
-                                            .as_str(),
-                                    ),
+                                    register_int_gauge!(opts).unwrap_or_else(|_| {
+                                        panic!("error while registering metric {}", metric_name)
+                                    }),
                                 ),
                                 FieldType::Float => MetricWithType::SingleFloat(
-                                    register_gauge!(opts).expect(
-                                        format!("error while registering metric {}", metric_name)
-                                            .as_str(),
-                                    ),
+                                    register_gauge!(opts).unwrap_or_else(|_| {
+                                        panic!("error while registering metric {}", metric_name)
+                                    }),
                                 ),
-                            };
-                        }
+                            }
+                        };
 
                         self.metric.push(new_metric);
                     }
