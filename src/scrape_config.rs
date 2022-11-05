@@ -314,21 +314,31 @@ impl ScrapeConfigQuery {
                         let new_labels: Vec<&str> = var_labels.iter().map(AsRef::as_ref).collect();
                         self.metric = match values.field_type {
                             FieldType::Int => vec![MetricWithType::VectorInt(
-                                register_int_gauge_vec!(opts, &new_labels).unwrap_or_else(|_| panic!("error while registering metric {}", self.metric_name)),
+                                register_int_gauge_vec!(opts, &new_labels).unwrap_or_else(|_| {
+                                    panic!("error while registering metric {}", self.metric_name)
+                                }),
                             )],
                             FieldType::Float => vec![MetricWithType::VectorFloat(
-                                register_gauge_vec!(opts, &new_labels).unwrap_or_else(|_| panic!("error while registering metric {}", self.metric_name)),
+                                register_gauge_vec!(opts, &new_labels).unwrap_or_else(|_| {
+                                    panic!("error while registering metric {}", self.metric_name)
+                                }),
                             )],
                         }
                     } else {
                         self.metric = match values.field_type {
                             FieldType::Int => vec![MetricWithType::SingleInt(
-                                register_int_gauge!(opts).unwrap_or_else(|_| panic!("error while registering metric {}", self.metric_name)),
+                                register_int_gauge!(opts).unwrap_or_else(|_| {
+                                    panic!("error while registering metric {}", self.metric_name)
+                                }),
                             )],
                             FieldType::Float => {
                                 vec![MetricWithType::SingleFloat(
-                                    register_gauge!(opts).unwrap_or_else(|_| panic!("error while registering metric {}",
-                                            self.metric_name)),
+                                    register_gauge!(opts).unwrap_or_else(|_| {
+                                        panic!(
+                                            "error while registering metric {}",
+                                            self.metric_name
+                                        )
+                                    }),
                                 )]
                             }
                         };
@@ -353,23 +363,41 @@ impl ScrapeConfigQuery {
                                 var_labels.iter().map(AsRef::as_ref).collect();
                             new_metric = match value.field_type {
                                 FieldType::Int => MetricWithType::VectorInt(
-                                    register_int_gauge_vec!(opts, &new_labels).unwrap_or_else(|_| panic!("error while registering metric {}",
-                                            self.metric_name)),
+                                    register_int_gauge_vec!(opts, &new_labels).unwrap_or_else(
+                                        |_| {
+                                            panic!(
+                                                "error while registering metric {}",
+                                                self.metric_name
+                                            )
+                                        },
+                                    ),
                                 ),
                                 FieldType::Float => MetricWithType::VectorFloat(
-                                    register_gauge_vec!(opts, &new_labels).unwrap_or_else(|_| panic!("error while registering metric {}",
-                                            self.metric_name)),
+                                    register_gauge_vec!(opts, &new_labels).unwrap_or_else(|_| {
+                                        panic!(
+                                            "error while registering metric {}",
+                                            self.metric_name
+                                        )
+                                    }),
                                 ),
                             }
                         } else {
                             new_metric = match value.field_type {
                                 FieldType::Int => MetricWithType::SingleInt(
-                                    register_int_gauge!(opts).unwrap_or_else(|_| panic!("error while registering metric {}",
-                                            self.metric_name)),
+                                    register_int_gauge!(opts).unwrap_or_else(|_| {
+                                        panic!(
+                                            "error while registering metric {}",
+                                            self.metric_name
+                                        )
+                                    }),
                                 ),
                                 FieldType::Float => MetricWithType::SingleFloat(
-                                    register_gauge!(opts).unwrap_or_else(|_| panic!("error while registering metric {}",
-                                            self.metric_name)),
+                                    register_gauge!(opts).unwrap_or_else(|_| {
+                                        panic!(
+                                            "error while registering metric {}",
+                                            self.metric_name
+                                        )
+                                    }),
                                 ),
                             };
                         }
@@ -393,19 +421,29 @@ impl ScrapeConfigQuery {
                                 var_labels.iter().map(AsRef::as_ref).collect();
                             new_metric = match value.field_type {
                                 FieldType::Int => MetricWithType::VectorInt(
-                                    register_int_gauge_vec!(opts, &new_labels).unwrap_or_else(|_| panic!("error while registering metric {}", metric_name)),
+                                    register_int_gauge_vec!(opts, &new_labels).unwrap_or_else(
+                                        |_| {
+                                            panic!("error while registering metric {}", metric_name)
+                                        },
+                                    ),
                                 ),
                                 FieldType::Float => MetricWithType::VectorFloat(
-                                    register_gauge_vec!(opts, &new_labels).unwrap_or_else(|_| panic!("error while registering metric {}", metric_name)),
+                                    register_gauge_vec!(opts, &new_labels).unwrap_or_else(|_| {
+                                        panic!("error while registering metric {}", metric_name)
+                                    }),
                                 ),
                             }
                         } else {
                             new_metric = match value.field_type {
                                 FieldType::Int => MetricWithType::SingleInt(
-                                    register_int_gauge!(opts).unwrap_or_else(|_| panic!("error while registering metric {}", metric_name)),
+                                    register_int_gauge!(opts).unwrap_or_else(|_| {
+                                        panic!("error while registering metric {}", metric_name)
+                                    }),
                                 ),
                                 FieldType::Float => MetricWithType::SingleFloat(
-                                    register_gauge!(opts).unwrap_or_else(|_| panic!("error while registering metric {}", metric_name)),
+                                    register_gauge!(opts).unwrap_or_else(|_| {
+                                        panic!("error while registering metric {}", metric_name)
+                                    }),
                                 ),
                             };
                         }
