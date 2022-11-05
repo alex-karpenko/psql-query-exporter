@@ -1,5 +1,7 @@
 name: Security audit
 on:
+  schedule:
+    - cron: "17 7 * * 5"
   push:
     branches:
       - main
