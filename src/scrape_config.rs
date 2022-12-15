@@ -420,9 +420,7 @@ impl ScrapeConfigQuery {
                             match value.field_type {
                                 FieldType::Int => MetricWithType::VectorInt(
                                     register_int_gauge_vec!(opts, &new_labels).unwrap_or_else(
-                                        |_| {
-                                            panic!("error while registering metric {metric_name}")
-                                        },
+                                        |_| panic!("error while registering metric {metric_name}"),
                                     ),
                                 ),
                                 FieldType::Float => MetricWithType::VectorFloat(
