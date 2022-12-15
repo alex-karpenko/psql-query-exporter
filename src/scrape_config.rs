@@ -421,13 +421,13 @@ impl ScrapeConfigQuery {
                                 FieldType::Int => MetricWithType::VectorInt(
                                     register_int_gauge_vec!(opts, &new_labels).unwrap_or_else(
                                         |_| {
-                                            panic!("error while registering metric {}", metric_name)
+                                            panic!("error while registering metric {metric_name}")
                                         },
                                     ),
                                 ),
                                 FieldType::Float => MetricWithType::VectorFloat(
                                     register_gauge_vec!(opts, &new_labels).unwrap_or_else(|_| {
-                                        panic!("error while registering metric {}", metric_name)
+                                        panic!("error while registering metric {metric_name}")
                                     }),
                                 ),
                             }
@@ -435,12 +435,12 @@ impl ScrapeConfigQuery {
                             match value.field_type {
                                 FieldType::Int => MetricWithType::SingleInt(
                                     register_int_gauge!(opts).unwrap_or_else(|_| {
-                                        panic!("error while registering metric {}", metric_name)
+                                        panic!("error while registering metric {metric_name}")
                                     }),
                                 ),
                                 FieldType::Float => MetricWithType::SingleFloat(
                                     register_gauge!(opts).unwrap_or_else(|_| {
-                                        panic!("error while registering metric {}", metric_name)
+                                        panic!("error while registering metric {metric_name}")
                                     }),
                                 ),
                             }
