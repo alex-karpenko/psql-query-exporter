@@ -1,19 +1,14 @@
 # TODO
 
-## Must have
-
-- Documentation
-- CI pipeline
-- License
-  
 ## Important improvements
 
+- Improve documentation
 - Implement TLS connection with custom CA and client's certificates.
 
-## Not ungent changes
+## Not urgent changes
 
 - Implement `query_timeout`.
-- Make backoff intervals configurable.
+- Make back-off intervals configurable.
 - Implement config reload endpoint and functionality, possibly use config file change as a trigger.
 - Implement metrics expiration after consecutive query failures.
 - Optional JSON logs.
