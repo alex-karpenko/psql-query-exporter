@@ -23,13 +23,13 @@ pub struct PostgresConnection {
 pub enum PostgresSslMode {
     Disable,
     Allow,
-    Preffer,
+    Prefer,
     Require,
 }
 
 impl Default for PostgresSslMode {
     fn default() -> Self {
-        Self::Preffer
+        Self::Prefer
     }
 }
 
@@ -39,7 +39,7 @@ impl Display for PostgresSslMode {
             Self::Disable => "disable",
             Self::Allow => "allow",
             Self::Require => "require",
-            Self::Preffer => "preffer",
+            Self::Prefer => "prefer",
         };
         write!(f, "{s}")
     }
@@ -47,7 +47,7 @@ impl Display for PostgresSslMode {
 
 impl PostgresConnection {
     pub async fn new(db_connection_string: String, ssl_verify: bool) -> Result<Self, Error> {
-        debug!("PostgresConnection::new: construct new postgress connection");
+        debug!("PostgresConnection::new: construct new postgres connection");
         let mut backoff_interval = DB_CONNECTION_DEFAULT_BACKOFF_INTERVAL;
 
         loop {
