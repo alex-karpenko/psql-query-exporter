@@ -10,7 +10,7 @@ jobs:
         rust:
           - stable
           - beta
-          - nightly
+#          - nightly
           - 1.60.0  # MSRV
 
     steps:

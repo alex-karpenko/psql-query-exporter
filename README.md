@@ -4,8 +4,8 @@
 
 ## Features
 
-- Allows querying of multiple DB instances (hosts) and multiple databases within each instace independently.
-- Flexible configuration of quieris, sources (fields) of metric's values, labels, queruing intervals, etc.
+- Allows querying of multiple DB instances (hosts) and multiple databases within each instance independently.
+- Flexible configuration of queries, sources (fields) of metric's values, labels, querying intervals, etc.
 - Fast, lightweight and scalable.
 
 ## Usage
@@ -34,7 +34,7 @@ USAGE:
 
 OPTIONS:
     -c, --config <CONFIG>          Path to config file
-    -d, --debug                    Enable extrime logging (debug)
+    -d, --debug                    Enable extreme logging (debug)
     -h, --help                     Print help information
         --listen-on <LISTEN_ON>    IP/hostname to listen on [default: 0.0.0.0]
         --port <PORT>              Port to serve http on [default: 9090]
@@ -42,7 +42,7 @@ OPTIONS:
     -V, --version                  Print version information
 ```
 
-The only mandatory parameter is a path to configuration file. Datailed explanation of all possible configuration options is in the dedicated [Configuration](#configuration) section. Just for test purpose, there is an [example config](config.yaml) file to query PosygreSQL server at `localhost` for replication lag values. To use it:
+The only mandatory parameter is a path to configuration file. Detailed explanation of all possible configuration options is in the dedicated [Configuration](#configuration) section. Just for test purpose, there is an [example config](config.yaml) file to query PostgreSQL server at `localhost` for replication lag values. To use it:
 
 ```bash
 docker run --rm --name psql-query-exporter -v $PWD/config.yaml:/config.yaml -e PG_USER=postgres -e PG_PASSWORD=postgres alexkarpenko/psql-query-exporter:latest --config /config.yaml -v
@@ -99,7 +99,7 @@ config:
 
 ### Build your own binary
 
-Since exported is written in Rust, you can use standart Rust tools to build binary for any platform you need. Of cource, you have to have [Rust](https://rust-lang.org) tool-chain installed.
+Since exported is written in Rust, you can use standard Rust tools to build binary for any platform you need. Of course, you have to have [Rust](https://rust-lang.org) tool-chain installed.
 
 ```bash
 cargo build --release
@@ -108,7 +108,7 @@ cargo build --release
 And run it:
 
 ```bash
-target/release/psql-query-exporter --config ./confg.yaml -v
+target/release/psql-query-exporter --config ./config.yaml -v
 ```
 
 ## Configuration
@@ -117,24 +117,24 @@ Configuration file has two sections: optional `defaults` and mandatory `sources`
 
 ### Defaults
 
-`defsults` intended to describe config-wide defaults, all values from this section will be applied to all sources/databases/queries from the `sources` section if the particular value isn't overriden in the corresponding section (if applicable).
+`defaults` intended to describe config-wide defaults, all values from this section will be applied to all sources/databases/queries from the `sources` section if the particular value isn't overridden in the corresponding section (if applicable).
 
 Here is default content of the section, so if you don't specify any value these defaults will be applied:
 
 ```yaml
 defaults:
   scrape_interval: 30m  # interval to run each query,
-                        # may be overriden by source/db/query config
+                        # may be overridden by source/db/query config
 
   query_timeout: 10s    # timeout to wait for result of each query, 
-                        # may be overriden by source/db/query config
+                        # may be overridden by source/db/query config
 
   metric_prefix: ""     # prefix for metric name, 
-                        # may be overriden by source/db/query config
+                        # may be overridden by source/db/query config
 
   ssl_verify: true      # if it's false and SSL is in use, 
-                        # than certificate verification will be omited, 
-                        # may be overriden by source/db config
+                        # than certificate verification will be omitted, 
+                        # may be overridden by source/db config
 
 ```
 
@@ -146,7 +146,7 @@ Second (mandatory) section is `sources`, it describes:
 - on which DBs,
 - and how to extract and present results as metrics.
 
-So `sources` section is a dictionary, each key is mnemonic name of the source. Each source is a database instance (DB host) with connection parameters (hostname, username, password, etc.) and list of `databases` inside that instace. Each `database` in the list contains list of `queries` to run against that DB with attributes that describe how to interpret query results and create metrics from them.
+So `sources` section is a dictionary, each key is mnemonic name of the source. Each source is a database instance (DB host) with connection parameters (hostname, username, password, etc.) and list of `databases` inside that instance. Each `database` in the list contains list of `queries` to run against that DB with attributes that describe how to interpret query results and create metrics from them.
 
 #### Sources definition
 
@@ -162,9 +162,9 @@ In the `host`, `user` and `password` values environment variables can be used to
 
 - Query can by any arbitrary SQL query that returns at least one numeric value (int of float column). This value is used as a gauge metric's value.
 - If query returns more than one values (columns), than either first column is used for metric's value (default) or you should explicitly specify metric's source in `values.single` section.
-- Query can return more than one valuable cloumns. In such case you should explicitly describe how to interpret each value and assosiate each one with either some aditional label(s) (`values.multi_labels`) or create separate metrics for each value (`values.multi_suffixes`) by adding suffix to the metric's name.
+- Query can return more than one valuable columns. In such case you should explicitly describe how to interpret each value and associate each one with either some additional label(s) (`values.multi_labels`) or create separate metrics for each value (`values.multi_suffixes`) by adding suffix to the metric's name.
 - If value of metric has float (not default integer) type you should explicitly specify it's type.
-- You can add arbitrary label/valee pair(s) to the metric (`const_labels`).
+- You can add arbitrary label/value pair(s) to the metric (`const_labels`).
 - You can add variable labels (`var_labels`) to the metric using query result as a source for values of the labels. In such case query should return non-numeric values (columns) with string type (char, varchar, text).
 - It's your responsibility to write query that returns value(s) with correct type of the fields: int/float for the metric's values and char/varchar/text for the labels. Exporter doesn't validate query statement or guess result's types, it just expect correct column's type.
 - `single`, `multi_labels` and `multi_suffixes` sub-sections in the `values` section of the query definition are mutually-exclusive.
@@ -173,7 +173,7 @@ In the `host`, `user` and `password` values environment variables can be used to
 
 Below is a detailed explanation of all possible configuration parameters. Default values for optional parameters are specified.
 
-Values of `defaults` (from the previous section) will be propagared to all underneath sections, level by level. So if you specify some value in the `defaults` section, than it will be used in each source, database and query if you don't override it at any level. If you change value of some parameter, it will be propagated in all underneath sub-sections of the section where it was changed.
+Values of `defaults` (from the previous section) will be propagated to all underneath sections, level by level. So if you specify some value in the `defaults` section, than it will be used in each source, database and query if you don't override it at any level. If you change value of some parameter, it will be propagated in all underneath sub-sections of the section where it was changed.
 
 ```yaml
 sources:
@@ -185,40 +185,40 @@ sources:
               # environment variable can be used here
     password: ""  # password to login to the DB, mandatory,
                   # environment variable can be used here
-    sslmode: preffer  # SSL mode to connect to the DB, optional,
-                      # possible values are: disable, allow, preffer, require
+    sslmode: prefer   # SSL mode to connect to the DB, optional,
+                      # possible values are: disable, allow, prefer, require
     scrape_interval: 30m  # scrape interval for all DBs/queries of the source, optional,
                           # overrides value from the default section,
-                          # can be overriden in DB/query section
+                          # can be overridden in DB/query section
     query_timeout: 10s  # value of the query timeout for all DBs/queries of the source, optional,
                         # overrides value from the default section,
-                        # can be overriden in DB/query section
-    metric_prefix: "" # will be added to names of the all metrics for tese DBs/queries, optional,
+                        # can be overridden in DB/query section
+    metric_prefix: "" # will be added to names of the all metrics for these DBs/queries, optional,
                       # overrides value from the default section,
-                      # can be overriden in DB/query section
+                      # can be overridden in DB/query section
     ssl_verify: true  # overrides value from the default section, optional,
-                      # can be overriden in DB/query section
+                      # can be overridden in DB/query section
 
-    datrabases:   # list of the databases inside the instance, mandatory
+    databases:   # list of the databases inside the instance, mandatory
       - name: ""  # DB name, mandatory
         scrape_interval: 30m  # the same as above, applied to all queries of the DB, optional
         query_timeout: 10s    # the same as above, applied to all queries of the DB, optional
         metric_prefix: ""     # the same as above, applied to all queries of the DB, optional
 
-        queries:  # list of quieries to run agains this particular instance/db, mandatory
+        queries:  # list of queries to run against this particular instance/db, mandatory
           - query: "" # query string, mandatory
             metric_name: "" # name that will be joined with the metric_prefix and underscore, mandatory
                             # if metric_prefix is empty, metric_name is used to form final name of the metric
-            scrape_interval: 30m  # the same as above, applied to this querie, optional
-            query_timeout: 10s    # the same as above, applied to this querie, optional
-            metric_prefix: ""     # the same as above, applied to this querie, optional
+            scrape_interval: 30m  # the same as above, applied to this query, optional
+            query_timeout: 10s    # the same as above, applied to this query, optional
+            metric_prefix: ""     # the same as above, applied to this query, optional
 
             # All values below are just for example, it's not default values.
             const_labels:           # all key/value pairs of this section will be added to the metric definition(s) of the query, optional
               label1: label_value1  # if metric_prefix="some_prefix" and metric_name="metric" than result metric will look like
               label2: label_value2  # some_prefix_metric{label1="label_value1",label2="label_value2"}
 
-            var_labels: # if query result has text column(s), thay can be used as label values
+            var_labels: # if query result has text column(s), they can be used as label values
               - label1  # in such case you should specify column names here as label names
               - label2  # values from the columns will be used as label values
 
@@ -268,8 +268,8 @@ source_name_3:
 
 #### Threads and timings
 
-Each database (not DB instance, but each item in the `sources.databases` list) uses its own thread to run querying loop. In other words, one list of queries uses its wn thread to. Just for exmple, if you have three DB instances (source) in the config with five DB name in each instance (five items in the databases list) than 15 thread will be run to serve querying process.
+Each database (not DB instance, but each item in the `sources.databases` list) uses its own thread to run querying loop. In other words, one list of queries uses its wn thread to. Just for example, if you have three DB instances (source) in the config with five DB name in each instance (five items in the databases list) than 15 thread will be run to serve querying process.
 
-Each thread is lightweight, and spend almost all time sleeping and waiting for time to run next query in list. So if you need to run heavy queries with long running-time be coutios and pay some attention to such parameters as `query_timeout` and `scrape_interval`, because each query in the list within each database entry will be running one-by-one with respect to scrape interval of each query.
+Each thread is lightweight, and spend almost all time sleeping and waiting for time to run next query in list. So if you need to run heavy queries with long running-time be cautious and pay some attention to such parameters as `query_timeout` and `scrape_interval`, because each query in the list within each database entry will be running one-by-one with respect to scrape interval of each query.
 
 For example, if you set scrape interval to 10s and query timeout to 5s and each of 2 queries in the list need 5s to return result, than all other queries within the same database will be postponed until end of that two.

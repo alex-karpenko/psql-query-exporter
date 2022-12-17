@@ -10,7 +10,7 @@ use tracing_subscriber::{
 #[derive(Parser, Debug)]
 #[clap(author, version, about)]
 pub struct AppConfig {
-    /// Enable extrime logging (debug)
+    /// Enable extreme logging (debug)
     #[clap(short, long)]
     pub debug: bool,
 
@@ -88,7 +88,7 @@ mod tests {
         );
 
         assert_eq!(
-            AppConfig::parse_listen_to_ip("qwert"),
+            AppConfig::parse_listen_to_ip("qwerty"),
             Err(String::from("unable to parse IP address"))
         );
 

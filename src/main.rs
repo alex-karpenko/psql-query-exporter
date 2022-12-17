@@ -22,7 +22,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // GET /
     let home_route = warp::path::end().map(|| warp::reply::html(HOME_PAGE_CONTENT));
     // GET /health
-    let health_route = warp::path("health").map(|| "healty\n");
+    let health_route = warp::path("health").map(|| "healthy\n");
     // GET /metrics
     let metrics_route = warp::path("metrics").and_then(metrics::compose_reply);
 

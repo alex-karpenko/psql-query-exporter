@@ -61,7 +61,7 @@ async fn collect_one_db_instance(mut database: ScrapeConfigDatabase) {
         database.ssl_verify.unwrap_or(true),
     )
     .await
-    .expect("can't create db cponnection due to some fatal errors");
+    .expect("can't create db connection due to some fatal errors");
 
     loop {
         for item in database.queries.iter_mut() {
