@@ -268,7 +268,7 @@ source_name_3:
 
 #### Threads and timings
 
-Each database (not DB instance, but each item in the `sources.databases` list) uses its own thread to run querying loop. In other words, one list of queries uses its wn thread to. Just for example, if you have three DB instances (source) in the config with five DB name in each instance (five items in the databases list) than 15 thread will be run to serve querying process.
+Each database (not DB instance, but each item in the `sources.databases` list) uses its own thread to run querying loop. In other words, one list of queries uses its own thread to process all queries. Just for example, if you have three DB instances (source) in the config with five DB name in each instance (five items in the databases list) than 15 thread will be run to serve querying process.
 
 Each thread is lightweight, and spend almost all time sleeping and waiting for time to run next query in list. So if you need to run heavy queries with long running-time be cautious and pay some attention to such parameters as `query_timeout` and `scrape_interval`, because each query in the list within each database entry will be running one-by-one with respect to scrape interval of each query.
 

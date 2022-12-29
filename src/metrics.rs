@@ -73,7 +73,7 @@ async fn collect_one_db_instance(mut database: ScrapeConfigDatabase) {
             let values = &item.values;
             let query = &item.query;
 
-            let result = db_connection.query(query).await;
+            let result = db_connection.query(query, item.query_timeout).await;
 
             match result {
                 Ok(result) => match values {

@@ -108,22 +108,45 @@ impl PostgresConnection {
         }
     }
 
-    pub async fn query(&mut self, query: &String) -> Result<Vec<Row>, Error> {
+    pub async fn query(
+        &mut self,
+        query: &String,
+        query_timeout: Duration,
+    ) -> Result<Vec<Row>, Error> {
         debug!("PostgresConnection::query: {query:?}");
         let mut backoff_interval = DB_CONNECTION_DEFAULT_BACKOFF_INTERVAL;
 
         loop {
-            let result = self.client.query(query, &[]).await;
+            // Set statement timeout
+            let result = self
+                .client
+                .query(
+                    format!("set statement_timeout={};", query_timeout.as_millis()).as_str(),
+                    &[],
+                )
+                .await;
             if let Err(e) = result {
-                error!("PostgresConnection::query: error: {e}");
+                error!("PostgresConnection::query: {e}");
                 if e.code().is_none() {
-                    debug!("PostgresConnection::query: try to reconnet after error");
+                    debug!("PostgresConnection::query: try to reconnect after error");
                     self.reconnect().await?;
                 } else {
                     return Err(e);
                 }
             } else {
-                return result;
+                // Execute actual query
+                let result = self.client.query(query, &[]).await;
+                if let Err(e) = result {
+                    error!("PostgresConnection::query: {e}");
+                    if e.code().is_none() {
+                        debug!("PostgresConnection::query: try to reconnect after error");
+                        self.reconnect().await?;
+                    } else {
+                        return Err(e);
+                    }
+                } else {
+                    return result;
+                }
             }
 
             tokio::time::sleep(backoff_interval).await;
