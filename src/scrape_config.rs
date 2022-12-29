@@ -21,6 +21,8 @@ use std::{
 
 const DEFAULT_SCRAPE_INTERVAL: Duration = Duration::from_secs(1800);
 const DEFAULT_QUERY_TIMEOUT: Duration = Duration::from_secs(10);
+const DB_CONNECTION_DEFAULT_BACKOFF_INTERVAL: Duration = Duration::from_secs(10);
+const DB_CONNECTION_MAXIMUM_BACKOFF_INTERVAL: Duration = Duration::from_secs(300);
 
 #[derive(Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -37,6 +39,10 @@ struct ScrapeConfigDefaults {
     scrape_interval: Duration,
     #[serde(with = "humantime_serde")]
     query_timeout: Duration,
+    #[serde(with = "humantime_serde", default)]
+    backoff_interval: Duration,
+    #[serde(with = "humantime_serde", default)]
+    max_backoff_interval: Duration,
     metric_prefix: Option<String>,
     ssl_verify: Option<bool>,
 }
@@ -55,6 +61,10 @@ pub struct ScrapeConfigSource {
     scrape_interval: Duration,
     #[serde(with = "humantime_serde", default)]
     query_timeout: Duration,
+    #[serde(with = "humantime_serde", default)]
+    backoff_interval: Duration,
+    #[serde(with = "humantime_serde", default)]
+    max_backoff_interval: Duration,
     metric_prefix: Option<String>,
     ssl_verify: Option<bool>,
     pub databases: Vec<ScrapeConfigDatabase>,
@@ -70,6 +80,10 @@ pub struct ScrapeConfigDatabase {
     scrape_interval: Duration,
     #[serde(with = "humantime_serde", default)]
     query_timeout: Duration,
+    #[serde(with = "humantime_serde", default)]
+    pub backoff_interval: Duration,
+    #[serde(with = "humantime_serde", default)]
+    pub max_backoff_interval: Duration,
     metric_prefix: Option<String>,
     #[serde(skip)]
     pub ssl_verify: Option<bool>,
@@ -173,6 +187,8 @@ impl Default for ScrapeConfigDefaults {
         Self {
             scrape_interval: DEFAULT_SCRAPE_INTERVAL,
             query_timeout: DEFAULT_QUERY_TIMEOUT,
+            backoff_interval: DB_CONNECTION_DEFAULT_BACKOFF_INTERVAL,
+            max_backoff_interval: DB_CONNECTION_MAXIMUM_BACKOFF_INTERVAL,
             metric_prefix: None,
             ssl_verify: None,
         }
@@ -197,6 +213,18 @@ impl ScrapeConfigSource {
                 defaults.query_timeout
             } else {
                 self.query_timeout
+            },
+            backoff_interval: if self.backoff_interval == Duration::default() {
+                self.backoff_interval = defaults.backoff_interval;
+                defaults.backoff_interval
+            } else {
+                self.backoff_interval
+            },
+            max_backoff_interval: if self.max_backoff_interval == Duration::default() {
+                self.max_backoff_interval = defaults.max_backoff_interval;
+                defaults.max_backoff_interval
+            } else {
+                self.max_backoff_interval
             },
             metric_prefix: match self.metric_prefix {
                 None => {
@@ -256,6 +284,18 @@ impl ScrapeConfigDatabase {
                 defaults.query_timeout
             } else {
                 self.query_timeout
+            },
+            backoff_interval: if self.backoff_interval == Duration::default() {
+                self.backoff_interval = defaults.backoff_interval;
+                defaults.backoff_interval
+            } else {
+                self.backoff_interval
+            },
+            max_backoff_interval: if self.max_backoff_interval == Duration::default() {
+                self.max_backoff_interval = defaults.max_backoff_interval;
+                defaults.max_backoff_interval
+            } else {
+                self.max_backoff_interval
             },
             metric_prefix: match self.metric_prefix {
                 None => {

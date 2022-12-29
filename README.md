@@ -69,6 +69,8 @@ config:
   defaults:
     scrape_interval: 30s
     query_timeout: 5s
+    backoff_interval: 10s
+    max_backoff_interval: 300s
 
   sources:
     postgres:
@@ -135,6 +137,12 @@ defaults:
   ssl_verify: true      # if it's false and SSL is in use, 
                         # than certificate verification will be omitted, 
                         # may be overridden by source/db config
+  backoff_interval: 10s # default interval between failed connection attempts
+  max_backoff_interval: 300s # every time after failed connection to the DB
+                             # interval between connection attempts increases 
+                             # by value of backoff_interval, but no more than value
+                             # of the max_backoff_interval
+
 
 ```
 
@@ -193,6 +201,11 @@ sources:
     query_timeout: 10s  # value of the query timeout for all DBs/queries of the source, optional,
                         # overrides value from the default section,
                         # can be overridden in DB/query section
+    backoff_interval: 10s # default interval between failed connection attempts
+    max_backoff_interval: 300s # every time after failed connection to the DB
+                              # interval between connection attempts increases 
+                              # by value of backoff_interval, but no more than value
+                              # of the max_backoff_interval
     metric_prefix: "" # will be added to names of the all metrics for these DBs/queries, optional,
                       # overrides value from the default section,
                       # can be overridden in DB/query section
@@ -203,6 +216,11 @@ sources:
       - name: ""  # DB name, mandatory
         scrape_interval: 30m  # the same as above, applied to all queries of the DB, optional
         query_timeout: 10s    # the same as above, applied to all queries of the DB, optional
+        backoff_interval: 10s # default interval between failed connection attempts
+        max_backoff_interval: 300s # every time after failed connection to the DB
+                                  # interval between connection attempts increases 
+                                  # by value of backoff_interval, but no more than value
+                                  # of the max_backoff_interval
         metric_prefix: ""     # the same as above, applied to all queries of the DB, optional
 
         queries:  # list of queries to run against this particular instance/db, mandatory

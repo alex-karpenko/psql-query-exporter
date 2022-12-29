@@ -59,6 +59,8 @@ async fn collect_one_db_instance(mut database: ScrapeConfigDatabase) {
     let mut db_connection = PostgresConnection::new(
         database.connection_string,
         database.ssl_verify.unwrap_or(true),
+        database.backoff_interval,
+        database.max_backoff_interval,
     )
     .await
     .expect("can't create db connection due to some fatal errors");
