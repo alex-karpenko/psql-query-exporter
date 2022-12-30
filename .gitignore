@@ -2,3 +2,4 @@
 /values-dev.yaml
 /config-dev.yaml
 .vscode
+/tests/**

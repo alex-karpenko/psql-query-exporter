@@ -36,8 +36,8 @@ OPTIONS:
     -c, --config <CONFIG>          Path to config file
     -d, --debug                    Enable extreme logging (debug)
     -h, --help                     Print help information
-        --listen-on <LISTEN_ON>    IP/hostname to listen on [default: 0.0.0.0]
-        --port <PORT>              Port to serve http on [default: 9090]
+    -l  --listen-on <LISTEN_ON>    IP/hostname to listen on [default: 0.0.0.0]
+    -p  --port <PORT>              Port to serve http on [default: 9090]
     -v, --verbose                  Enable additional logging (info)
     -V, --version                  Print version information
 ```
@@ -69,6 +69,8 @@ config:
   defaults:
     scrape_interval: 30s
     query_timeout: 5s
+    backoff_interval: 10s
+    max_backoff_interval: 300s
 
   sources:
     postgres:
@@ -136,6 +138,17 @@ defaults:
                         # than certificate verification will be omitted, 
                         # may be overridden by source/db config
 
+  metric_expiration_time: 0s # if all query attempts during this time were failed,
+                             # then metric should be excluded from the output 
+                             # until first successful query execution
+
+  backoff_interval: 10s # default interval between failed connection attempts
+  max_backoff_interval: 300s # every time after failed connection to the DB
+                             # interval between connection attempts increases 
+                             # by value of backoff_interval, but no more than value
+                             # of the max_backoff_interval
+
+
 ```
 
 ### Sources
@@ -193,6 +206,14 @@ sources:
     query_timeout: 10s  # value of the query timeout for all DBs/queries of the source, optional,
                         # overrides value from the default section,
                         # can be overridden in DB/query section
+    metric_expiration_time: 0s  # if all query attempts during this time were failed,
+                                # then metric should be excluded from the output 
+                                # until first successful query execution
+    backoff_interval: 10s # default interval between failed connection attempts
+    max_backoff_interval: 300s # every time after failed connection to the DB
+                              # interval between connection attempts increases 
+                              # by value of backoff_interval, but no more than value
+                              # of the max_backoff_interval
     metric_prefix: "" # will be added to names of the all metrics for these DBs/queries, optional,
                       # overrides value from the default section,
                       # can be overridden in DB/query section
@@ -203,6 +224,14 @@ sources:
       - name: ""  # DB name, mandatory
         scrape_interval: 30m  # the same as above, applied to all queries of the DB, optional
         query_timeout: 10s    # the same as above, applied to all queries of the DB, optional
+        metric_expiration_time: 0s  # if all query attempts during this time were failed,
+                                    # then metric should be excluded from the output 
+                                    # until first successful query execution
+        backoff_interval: 10s # default interval between failed connection attempts
+        max_backoff_interval: 300s # every time after failed connection to the DB
+                                  # interval between connection attempts increases 
+                                  # by value of backoff_interval, but no more than value
+                                  # of the max_backoff_interval
         metric_prefix: ""     # the same as above, applied to all queries of the DB, optional
 
         queries:  # list of queries to run against this particular instance/db, mandatory
@@ -211,6 +240,9 @@ sources:
                             # if metric_prefix is empty, metric_name is used to form final name of the metric
             scrape_interval: 30m  # the same as above, applied to this query, optional
             query_timeout: 10s    # the same as above, applied to this query, optional
+            metric_expiration_time: 0s  # if all query attempts during this time were failed,
+                                        # then metric should be excluded from the output 
+                                        # until first successful query execution
             metric_prefix: ""     # the same as above, applied to this query, optional
 
             # All values below are just for example, it's not default values.
@@ -268,7 +300,7 @@ source_name_3:
 
 #### Threads and timings
 
-Each database (not DB instance, but each item in the `sources.databases` list) uses its own thread to run querying loop. In other words, one list of queries uses its wn thread to. Just for example, if you have three DB instances (source) in the config with five DB name in each instance (five items in the databases list) than 15 thread will be run to serve querying process.
+Each database (not DB instance, but each item in the `sources.databases` list) uses its own thread to run querying loop. In other words, one list of queries uses its own thread to process all queries. Just for example, if you have three DB instances (source) in the config with five DB name in each instance (five items in the databases list) than 15 thread will be run to serve querying process.
 
 Each thread is lightweight, and spend almost all time sleeping and waiting for time to run next query in list. So if you need to run heavy queries with long running-time be cautious and pay some attention to such parameters as `query_timeout` and `scrape_interval`, because each query in the list within each database entry will be running one-by-one with respect to scrape interval of each query.
 

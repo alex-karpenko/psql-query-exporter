@@ -1,26 +1,20 @@
 use crate::db::PostgresSslMode;
-use crate::metrics::MetricWithType;
 
 use figment::{
     providers::{Format, Yaml},
     Error, Figment,
 };
-use prometheus::{
-    opts, register_gauge, register_gauge_vec, register_int_gauge, register_int_gauge_vec,
-};
 
 use regex::Regex;
 use serde::Deserialize;
 
-use std::{
-    collections::HashMap,
-    env,
-    path::PathBuf,
-    time::{Duration, SystemTime},
-};
+use std::{collections::HashMap, env, path::PathBuf, time::Duration};
 
 const DEFAULT_SCRAPE_INTERVAL: Duration = Duration::from_secs(1800);
 const DEFAULT_QUERY_TIMEOUT: Duration = Duration::from_secs(10);
+const DEFAULT_METRIC_EXPIRATION_TIME: Duration = Duration::ZERO;
+const DB_CONNECTION_DEFAULT_BACKOFF_INTERVAL: Duration = Duration::from_secs(10);
+const DB_CONNECTION_MAXIMUM_BACKOFF_INTERVAL: Duration = Duration::from_secs(300);
 
 #[derive(Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -37,6 +31,12 @@ struct ScrapeConfigDefaults {
     scrape_interval: Duration,
     #[serde(with = "humantime_serde")]
     query_timeout: Duration,
+    #[serde(with = "humantime_serde")]
+    backoff_interval: Duration,
+    #[serde(with = "humantime_serde")]
+    max_backoff_interval: Duration,
+    #[serde(with = "humantime_serde")]
+    metric_expiration_time: Duration,
     metric_prefix: Option<String>,
     ssl_verify: Option<bool>,
 }
@@ -55,6 +55,12 @@ pub struct ScrapeConfigSource {
     scrape_interval: Duration,
     #[serde(with = "humantime_serde", default)]
     query_timeout: Duration,
+    #[serde(with = "humantime_serde", default)]
+    backoff_interval: Duration,
+    #[serde(with = "humantime_serde", default)]
+    max_backoff_interval: Duration,
+    #[serde(with = "humantime_serde", default)]
+    metric_expiration_time: Duration,
     metric_prefix: Option<String>,
     ssl_verify: Option<bool>,
     pub databases: Vec<ScrapeConfigDatabase>,
@@ -70,6 +76,12 @@ pub struct ScrapeConfigDatabase {
     scrape_interval: Duration,
     #[serde(with = "humantime_serde", default)]
     query_timeout: Duration,
+    #[serde(with = "humantime_serde", default)]
+    pub backoff_interval: Duration,
+    #[serde(with = "humantime_serde", default)]
+    pub max_backoff_interval: Duration,
+    #[serde(with = "humantime_serde", default)]
+    metric_expiration_time: Duration,
     metric_prefix: Option<String>,
     #[serde(skip)]
     pub ssl_verify: Option<bool>,
@@ -86,16 +98,14 @@ pub struct ScrapeConfigQuery {
     pub scrape_interval: Duration,
     #[serde(with = "humantime_serde", default)]
     pub query_timeout: Duration,
+    #[serde(with = "humantime_serde", default)]
+    pub metric_expiration_time: Duration,
     #[serde(default)]
-    const_labels: Option<HashMap<String, String>>,
+    pub const_labels: Option<HashMap<String, String>>,
     #[serde(default)]
     pub var_labels: Option<Vec<String>>,
     #[serde(default)]
     pub values: ScrapeConfigValues, // These two vectors have the same size
-    #[serde(skip)] // because they represent array of possible
-    pub metric: Vec<MetricWithType>, // metrics with respect to possible multi-values query result
-    #[serde(skip, default = "SystemTime::now")]
-    pub next_query_time: SystemTime,
 }
 
 #[derive(Deserialize, Debug)]
@@ -114,7 +124,7 @@ pub enum ScrapeConfigValues {
 pub struct FieldWithType {
     pub field: Option<String>,
     #[serde(rename = "type", default)]
-    field_type: FieldType,
+    pub field_type: FieldType,
 }
 
 #[derive(Deserialize, Debug)]
@@ -122,7 +132,7 @@ pub struct FieldWithType {
 pub struct FieldWithLabels {
     pub field: String,
     #[serde(rename = "type", default)]
-    field_type: FieldType,
+    pub field_type: FieldType,
     pub labels: HashMap<String, String>,
 }
 
@@ -131,13 +141,13 @@ pub struct FieldWithLabels {
 pub struct FieldWithSuffix {
     pub field: String,
     #[serde(rename = "type", default)]
-    field_type: FieldType,
+    pub field_type: FieldType,
     pub suffix: String,
 }
 
 #[derive(Deserialize, Debug)]
 #[serde(deny_unknown_fields, rename_all = "lowercase")]
-enum FieldType {
+pub enum FieldType {
     Int,
     Float,
 }
@@ -173,6 +183,9 @@ impl Default for ScrapeConfigDefaults {
         Self {
             scrape_interval: DEFAULT_SCRAPE_INTERVAL,
             query_timeout: DEFAULT_QUERY_TIMEOUT,
+            backoff_interval: DB_CONNECTION_DEFAULT_BACKOFF_INTERVAL,
+            max_backoff_interval: DB_CONNECTION_MAXIMUM_BACKOFF_INTERVAL,
+            metric_expiration_time: DEFAULT_METRIC_EXPIRATION_TIME,
             metric_prefix: None,
             ssl_verify: None,
         }
@@ -197,6 +210,24 @@ impl ScrapeConfigSource {
                 defaults.query_timeout
             } else {
                 self.query_timeout
+            },
+            backoff_interval: if self.backoff_interval == Duration::default() {
+                self.backoff_interval = defaults.backoff_interval;
+                defaults.backoff_interval
+            } else {
+                self.backoff_interval
+            },
+            max_backoff_interval: if self.max_backoff_interval == Duration::default() {
+                self.max_backoff_interval = defaults.max_backoff_interval;
+                defaults.max_backoff_interval
+            } else {
+                self.max_backoff_interval
+            },
+            metric_expiration_time: if self.metric_expiration_time == Duration::default() {
+                self.metric_expiration_time = defaults.metric_expiration_time;
+                defaults.metric_expiration_time
+            } else {
+                self.metric_expiration_time
             },
             metric_prefix: match self.metric_prefix {
                 None => {
@@ -257,6 +288,24 @@ impl ScrapeConfigDatabase {
             } else {
                 self.query_timeout
             },
+            backoff_interval: if self.backoff_interval == Duration::default() {
+                self.backoff_interval = defaults.backoff_interval;
+                defaults.backoff_interval
+            } else {
+                self.backoff_interval
+            },
+            max_backoff_interval: if self.max_backoff_interval == Duration::default() {
+                self.max_backoff_interval = defaults.max_backoff_interval;
+                defaults.max_backoff_interval
+            } else {
+                self.max_backoff_interval
+            },
+            metric_expiration_time: if self.metric_expiration_time == Duration::default() {
+                self.metric_expiration_time = defaults.metric_expiration_time;
+                defaults.metric_expiration_time
+            } else {
+                self.metric_expiration_time
+            },
             metric_prefix: match self.metric_prefix {
                 None => {
                     self.metric_prefix = defaults.metric_prefix.clone();
@@ -275,7 +324,6 @@ impl ScrapeConfigDatabase {
 
         self.queries.iter_mut().for_each(|q| {
             q.propagate_defaults(&defaults);
-            q.prepare_metric();
         });
     }
 }
@@ -292,6 +340,11 @@ impl ScrapeConfigQuery {
         } else {
             self.query_timeout
         };
+        self.metric_expiration_time = if self.metric_expiration_time == Duration::default() {
+            defaults.metric_expiration_time
+        } else {
+            self.metric_expiration_time
+        };
         self.metric_prefix = match self.metric_prefix {
             None => defaults.metric_prefix.clone(),
             _ => self.metric_prefix.clone(),
@@ -300,159 +353,6 @@ impl ScrapeConfigQuery {
         if let Some(prefix) = &self.metric_prefix {
             self.metric_name = format!("{}_{}", prefix, self.metric_name);
         }
-    }
-
-    fn prepare_metric(&mut self) {
-        if self.metric.is_empty() {
-            match &self.values {
-                ScrapeConfigValues::ValueFrom(values) => {
-                    let mut opts = opts!(self.metric_name.clone(), self.metric_name.clone());
-                    if let Some(const_labels) = &self.const_labels {
-                        opts = opts.const_labels(const_labels.clone());
-                    }
-                    if let Some(var_labels) = &self.var_labels {
-                        let new_labels: Vec<&str> = var_labels.iter().map(AsRef::as_ref).collect();
-                        self.metric = match values.field_type {
-                            FieldType::Int => vec![MetricWithType::VectorInt(
-                                register_int_gauge_vec!(opts, &new_labels).unwrap_or_else(|_| {
-                                    panic!("error while registering metric {}", self.metric_name)
-                                }),
-                            )],
-                            FieldType::Float => vec![MetricWithType::VectorFloat(
-                                register_gauge_vec!(opts, &new_labels).unwrap_or_else(|_| {
-                                    panic!("error while registering metric {}", self.metric_name)
-                                }),
-                            )],
-                        }
-                    } else {
-                        self.metric = match values.field_type {
-                            FieldType::Int => vec![MetricWithType::SingleInt(
-                                register_int_gauge!(opts).unwrap_or_else(|_| {
-                                    panic!("error while registering metric {}", self.metric_name)
-                                }),
-                            )],
-                            FieldType::Float => {
-                                vec![MetricWithType::SingleFloat(
-                                    register_gauge!(opts).unwrap_or_else(|_| {
-                                        panic!(
-                                            "error while registering metric {}",
-                                            self.metric_name
-                                        )
-                                    }),
-                                )]
-                            }
-                        };
-                    }
-                }
-
-                ScrapeConfigValues::ValuesWithLabels(values) => {
-                    self.metric = vec![];
-
-                    for value in values {
-                        let mut opts = opts!(self.metric_name.clone(), self.metric_name.clone());
-                        if let Some(const_labels) = &self.const_labels {
-                            let mut const_labels = const_labels.clone();
-                            value.labels.iter().for_each(|(k, v)| {
-                                const_labels.insert(k.to_string(), v.to_string());
-                            });
-                            opts = opts.const_labels(const_labels);
-                        }
-                        let new_metric = if let Some(var_labels) = &self.var_labels {
-                            let new_labels: Vec<&str> =
-                                var_labels.iter().map(AsRef::as_ref).collect();
-                            match value.field_type {
-                                FieldType::Int => MetricWithType::VectorInt(
-                                    register_int_gauge_vec!(opts, &new_labels).unwrap_or_else(
-                                        |_| {
-                                            panic!(
-                                                "error while registering metric {}",
-                                                self.metric_name
-                                            )
-                                        },
-                                    ),
-                                ),
-                                FieldType::Float => MetricWithType::VectorFloat(
-                                    register_gauge_vec!(opts, &new_labels).unwrap_or_else(|_| {
-                                        panic!(
-                                            "error while registering metric {}",
-                                            self.metric_name
-                                        )
-                                    }),
-                                ),
-                            }
-                        } else {
-                            match value.field_type {
-                                FieldType::Int => MetricWithType::SingleInt(
-                                    register_int_gauge!(opts).unwrap_or_else(|_| {
-                                        panic!(
-                                            "error while registering metric {}",
-                                            self.metric_name
-                                        )
-                                    }),
-                                ),
-                                FieldType::Float => MetricWithType::SingleFloat(
-                                    register_gauge!(opts).unwrap_or_else(|_| {
-                                        panic!(
-                                            "error while registering metric {}",
-                                            self.metric_name
-                                        )
-                                    }),
-                                ),
-                            }
-                        };
-
-                        self.metric.push(new_metric);
-                    }
-                }
-
-                ScrapeConfigValues::ValuesWithSuffixes(values) => {
-                    self.metric = vec![];
-
-                    for value in values {
-                        let metric_name = format!("{}_{}", self.metric_name, value.suffix);
-                        let mut opts = opts!(metric_name.clone(), metric_name.clone());
-                        if let Some(const_labels) = &self.const_labels {
-                            opts = opts.const_labels(const_labels.clone());
-                        }
-                        let new_metric = if let Some(var_labels) = &self.var_labels {
-                            let new_labels: Vec<&str> =
-                                var_labels.iter().map(AsRef::as_ref).collect();
-                            match value.field_type {
-                                FieldType::Int => MetricWithType::VectorInt(
-                                    register_int_gauge_vec!(opts, &new_labels).unwrap_or_else(
-                                        |_| panic!("error while registering metric {metric_name}"),
-                                    ),
-                                ),
-                                FieldType::Float => MetricWithType::VectorFloat(
-                                    register_gauge_vec!(opts, &new_labels).unwrap_or_else(|_| {
-                                        panic!("error while registering metric {metric_name}")
-                                    }),
-                                ),
-                            }
-                        } else {
-                            match value.field_type {
-                                FieldType::Int => MetricWithType::SingleInt(
-                                    register_int_gauge!(opts).unwrap_or_else(|_| {
-                                        panic!("error while registering metric {metric_name}")
-                                    }),
-                                ),
-                                FieldType::Float => MetricWithType::SingleFloat(
-                                    register_gauge!(opts).unwrap_or_else(|_| {
-                                        panic!("error while registering metric {metric_name}")
-                                    }),
-                                ),
-                            }
-                        };
-
-                        self.metric.push(new_metric);
-                    }
-                }
-            };
-        };
-    }
-
-    pub fn schedule_next_query_time(&self) -> SystemTime {
-        SystemTime::now() + self.scrape_interval
     }
 }
 

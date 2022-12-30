@@ -7,15 +7,14 @@ use postgres_native_tls::MakeTlsConnector;
 use tokio::task::JoinHandle;
 use tokio_postgres::{Client, Error, Row};
 
-const DB_CONNECTION_DEFAULT_BACKOFF_INTERVAL: Duration = Duration::from_secs(10);
-const DB_CONNECTION_MAXIMUM_BACKOFF_INTERVAL: Duration = Duration::from_secs(300);
-
 #[derive(Debug)]
 pub struct PostgresConnection {
     db_connection_string: String,
     client: Client,
     connection_handler: JoinHandle<()>,
     ssl_verify: bool,
+    default_backoff_interval: Duration,
+    max_backoff_interval: Duration,
 }
 
 #[derive(Deserialize, Debug)]
@@ -46,10 +45,15 @@ impl Display for PostgresSslMode {
 }
 
 impl PostgresConnection {
-    pub async fn new(db_connection_string: String, ssl_verify: bool) -> Result<Self, Error> {
+    pub async fn new(
+        db_connection_string: String,
+        ssl_verify: bool,
+        default_backoff_interval: Duration,
+        max_backoff_interval: Duration,
+    ) -> Result<Self, Error> {
         debug!("PostgresConnection::new: construct new postgres connection");
-        let mut backoff_interval = DB_CONNECTION_DEFAULT_BACKOFF_INTERVAL;
 
+        let mut backoff_interval = default_backoff_interval;
         loop {
             let connector = TlsConnector::builder()
                 .danger_accept_invalid_certs(!ssl_verify)
@@ -75,6 +79,8 @@ impl PostgresConnection {
                         db_connection_string,
                         connection_handler,
                         ssl_verify,
+                        default_backoff_interval,
+                        max_backoff_interval,
                     });
                 }
                 Err(e) => {
@@ -83,17 +89,22 @@ impl PostgresConnection {
             };
 
             tokio::time::sleep(backoff_interval).await;
-            backoff_interval += DB_CONNECTION_DEFAULT_BACKOFF_INTERVAL;
-            if backoff_interval > DB_CONNECTION_MAXIMUM_BACKOFF_INTERVAL {
-                backoff_interval = DB_CONNECTION_MAXIMUM_BACKOFF_INTERVAL;
+            backoff_interval += default_backoff_interval;
+            if backoff_interval > max_backoff_interval {
+                backoff_interval = max_backoff_interval;
             }
         }
     }
 
     async fn reconnect(&mut self) -> Result<&Self, Error> {
         debug!("PostgresConnection::reconnect: try to reconnect");
-        let new_connection =
-            PostgresConnection::new(self.db_connection_string.clone(), self.ssl_verify).await;
+        let new_connection = PostgresConnection::new(
+            self.db_connection_string.clone(),
+            self.ssl_verify,
+            self.default_backoff_interval,
+            self.max_backoff_interval,
+        )
+        .await;
 
         match new_connection {
             Ok(conn) => {
@@ -108,28 +119,51 @@ impl PostgresConnection {
         }
     }
 
-    pub async fn query(&mut self, query: &String) -> Result<Vec<Row>, Error> {
+    pub async fn query(
+        &mut self,
+        query: &String,
+        query_timeout: Duration,
+    ) -> Result<Vec<Row>, Error> {
         debug!("PostgresConnection::query: {query:?}");
-        let mut backoff_interval = DB_CONNECTION_DEFAULT_BACKOFF_INTERVAL;
+        let mut backoff_interval = self.default_backoff_interval;
 
         loop {
-            let result = self.client.query(query, &[]).await;
+            // Set statement timeout
+            let result = self
+                .client
+                .query(
+                    format!("set statement_timeout={};", query_timeout.as_millis()).as_str(),
+                    &[],
+                )
+                .await;
             if let Err(e) = result {
-                error!("PostgresConnection::query: error: {e}");
+                error!("PostgresConnection::query: {e}");
                 if e.code().is_none() {
-                    debug!("PostgresConnection::query: try to reconnet after error");
+                    debug!("PostgresConnection::query: try to reconnect after error");
                     self.reconnect().await?;
                 } else {
                     return Err(e);
                 }
             } else {
-                return result;
+                // Execute actual query
+                let result = self.client.query(query, &[]).await;
+                if let Err(e) = result {
+                    error!("PostgresConnection::query: {e}");
+                    if e.code().is_none() {
+                        debug!("PostgresConnection::query: try to reconnect after error");
+                        self.reconnect().await?;
+                    } else {
+                        return Err(e);
+                    }
+                } else {
+                    return result;
+                }
             }
 
             tokio::time::sleep(backoff_interval).await;
-            backoff_interval += DB_CONNECTION_DEFAULT_BACKOFF_INTERVAL;
-            if backoff_interval > DB_CONNECTION_MAXIMUM_BACKOFF_INTERVAL {
-                backoff_interval = DB_CONNECTION_MAXIMUM_BACKOFF_INTERVAL;
+            backoff_interval += self.default_backoff_interval;
+            if backoff_interval > self.max_backoff_interval {
+                backoff_interval = self.max_backoff_interval;
             }
         }
     }

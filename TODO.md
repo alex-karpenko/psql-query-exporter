@@ -7,9 +7,5 @@
 
 ## Not urgent changes
 
-- Implement `query_timeout`.
-- Make back-off intervals configurable.
-- Implement config reload endpoint and functionality, possibly use config file change as a trigger.
-- Implement metrics expiration after consecutive query failures.
 - Optional JSON logs.
 - Unit and integration tests.
