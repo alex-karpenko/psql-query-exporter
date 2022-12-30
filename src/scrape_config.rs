@@ -8,12 +8,7 @@ use figment::{
 use regex::Regex;
 use serde::Deserialize;
 
-use std::{
-    collections::HashMap,
-    env,
-    path::PathBuf,
-    time::Duration,
-};
+use std::{collections::HashMap, env, path::PathBuf, time::Duration};
 
 const DEFAULT_SCRAPE_INTERVAL: Duration = Duration::from_secs(1800);
 const DEFAULT_QUERY_TIMEOUT: Duration = Duration::from_secs(10);

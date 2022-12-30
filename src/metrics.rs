@@ -304,7 +304,9 @@ async fn collect_one_db_instance(database: ScrapeConfigDatabase) {
                 continue;
             }
 
-            let result = db_connection.query(&query_item.query, query_item.query_timeout).await;
+            let result = db_connection
+                .query(&query_item.query, query_item.query_timeout)
+                .await;
 
             match result {
                 Ok(result) => {
@@ -330,13 +332,23 @@ async fn collect_one_db_instance(database: ScrapeConfigDatabase) {
                         ScrapeConfigValues::ValuesWithLabels(values) => {
                             for (value, metric) in values.iter().zip(&query_metrics[index].metrics)
                             {
-                                update_metrics(&result, Some(&value.field), &query_item.var_labels, metric)
+                                update_metrics(
+                                    &result,
+                                    Some(&value.field),
+                                    &query_item.var_labels,
+                                    metric,
+                                )
                             }
                         }
                         ScrapeConfigValues::ValuesWithSuffixes(values) => {
                             for (value, metric) in values.iter().zip(&query_metrics[index].metrics)
                             {
-                                update_metrics(&result, Some(&value.field), &query_item.var_labels, metric)
+                                update_metrics(
+                                    &result,
+                                    Some(&value.field),
+                                    &query_item.var_labels,
+                                    metric,
+                                )
                             }
                         }
                     }
