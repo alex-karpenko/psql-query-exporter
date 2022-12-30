@@ -19,11 +19,11 @@ pub struct AppConfig {
     pub verbose: bool,
 
     /// IP/hostname to listen on
-    #[clap(long, default_value_t = Ipv4Addr::new(0, 0, 0, 0), value_parser = AppConfig::parse_listen_to_ip)]
+    #[clap(short, long, default_value_t = Ipv4Addr::new(0, 0, 0, 0), value_parser = AppConfig::parse_listen_to_ip)]
     pub listen_on: Ipv4Addr,
 
     /// Port to serve http on
-    #[clap(long, default_value_t = 9090, value_parser = clap::value_parser!(u16).range(1..=65535))]
+    #[clap(short, long, default_value_t = 9090, value_parser = clap::value_parser!(u16).range(1..=65535))]
     pub port: u16,
 
     /// Path to config file

@@ -12,7 +12,7 @@ use std::{
     collections::HashMap,
     env,
     path::PathBuf,
-    time::{Duration, SystemTime},
+    time::Duration,
 };
 
 const DEFAULT_SCRAPE_INTERVAL: Duration = Duration::from_secs(1800);
@@ -111,8 +111,6 @@ pub struct ScrapeConfigQuery {
     pub var_labels: Option<Vec<String>>,
     #[serde(default)]
     pub values: ScrapeConfigValues, // These two vectors have the same size
-    #[serde(skip, default = "SystemTime::now")]
-    pub next_query_time: SystemTime,
 }
 
 #[derive(Deserialize, Debug)]
@@ -360,10 +358,6 @@ impl ScrapeConfigQuery {
         if let Some(prefix) = &self.metric_prefix {
             self.metric_name = format!("{}_{}", prefix, self.metric_name);
         }
-    }
-
-    pub fn schedule_next_query_time(&self) -> SystemTime {
-        SystemTime::now() + self.scrape_interval
     }
 }
 

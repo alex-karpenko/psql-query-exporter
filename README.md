@@ -36,8 +36,8 @@ OPTIONS:
     -c, --config <CONFIG>          Path to config file
     -d, --debug                    Enable extreme logging (debug)
     -h, --help                     Print help information
-        --listen-on <LISTEN_ON>    IP/hostname to listen on [default: 0.0.0.0]
-        --port <PORT>              Port to serve http on [default: 9090]
+    -l  --listen-on <LISTEN_ON>    IP/hostname to listen on [default: 0.0.0.0]
+    -p  --port <PORT>              Port to serve http on [default: 9090]
     -v, --verbose                  Enable additional logging (info)
     -V, --version                  Print version information
 ```

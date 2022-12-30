@@ -25,6 +25,7 @@ struct QueryMetrics {
     metrics: Vec<MetricWithType>,
     is_registered: bool,
     last_updated: SystemTime,
+    next_query_time: SystemTime,
 }
 
 impl QueryMetrics {
@@ -205,6 +206,7 @@ impl QueryMetrics {
             metrics,
             is_registered: false,
             last_updated: SystemTime::now() - query_config.metric_expiration_time,
+            next_query_time: SystemTime::now(),
         }
     }
 
@@ -278,7 +280,7 @@ pub async fn collecting_task(scrape_config: ScrapeConfig) {
     }
 }
 
-async fn collect_one_db_instance(mut database: ScrapeConfigDatabase) {
+async fn collect_one_db_instance(database: ScrapeConfigDatabase) {
     debug!("collect_one_db_instance: start task for {database:?}");
     let mut db_connection = PostgresConnection::new(
         database.connection_string,
@@ -297,34 +299,30 @@ async fn collect_one_db_instance(mut database: ScrapeConfigDatabase) {
         .for_each(|q| query_metrics.push(QueryMetrics::from(q)));
 
     loop {
-        for (query_item, index) in database.queries.iter_mut().zip(0..query_metrics.len()) {
-            if query_item.next_query_time > SystemTime::now() {
+        for (query_item, index) in database.queries.iter().zip(0..query_metrics.len()) {
+            if query_metrics[index].next_query_time > SystemTime::now() {
                 continue;
             }
 
-            let var_labels = &query_item.var_labels;
-            let values = &query_item.values;
-            let query = &query_item.query;
-
-            let result = db_connection.query(query, query_item.query_timeout).await;
+            let result = db_connection.query(&query_item.query, query_item.query_timeout).await;
 
             match result {
                 Ok(result) => {
                     query_metrics[index].register(registry);
-                    match values {
+                    match &query_item.values {
                         ScrapeConfigValues::ValueFrom(value) => {
                             if let Some(field) = &value.field {
                                 update_metrics(
                                     &result,
                                     Some(field),
-                                    var_labels,
+                                    &query_item.var_labels,
                                     &query_metrics[index].metrics[0],
                                 )
                             } else {
                                 update_metrics(
                                     &result,
                                     None,
-                                    var_labels,
+                                    &query_item.var_labels,
                                     &query_metrics[index].metrics[0],
                                 )
                             }
@@ -332,13 +330,13 @@ async fn collect_one_db_instance(mut database: ScrapeConfigDatabase) {
                         ScrapeConfigValues::ValuesWithLabels(values) => {
                             for (value, metric) in values.iter().zip(&query_metrics[index].metrics)
                             {
-                                update_metrics(&result, Some(&value.field), var_labels, metric)
+                                update_metrics(&result, Some(&value.field), &query_item.var_labels, metric)
                             }
                         }
                         ScrapeConfigValues::ValuesWithSuffixes(values) => {
                             for (value, metric) in values.iter().zip(&query_metrics[index].metrics)
                             {
-                                update_metrics(&result, Some(&value.field), var_labels, metric)
+                                update_metrics(&result, Some(&value.field), &query_item.var_labels, metric)
                             }
                         }
                     }
@@ -355,11 +353,10 @@ async fn collect_one_db_instance(mut database: ScrapeConfigDatabase) {
                     error!("{e}")
                 }
             };
-            query_item.next_query_time = query_item.schedule_next_query_time();
+            query_metrics[index].next_query_time = SystemTime::now() + query_item.scrape_interval
         }
 
-        let next_query_time = database
-            .queries
+        let next_query_time = query_metrics
             .iter()
             .min_by(|x, y| x.next_query_time.cmp(&y.next_query_time))
             .map(|x| x.next_query_time)
