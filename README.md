@@ -137,6 +137,11 @@ defaults:
   ssl_verify: true      # if it's false and SSL is in use, 
                         # than certificate verification will be omitted, 
                         # may be overridden by source/db config
+
+  metric_expiration_time: 0s # if all query attempts during this time were failed,
+                             # then metric should be excluded from the output 
+                             # until first successful query execution
+
   backoff_interval: 10s # default interval between failed connection attempts
   max_backoff_interval: 300s # every time after failed connection to the DB
                              # interval between connection attempts increases 
@@ -201,6 +206,9 @@ sources:
     query_timeout: 10s  # value of the query timeout for all DBs/queries of the source, optional,
                         # overrides value from the default section,
                         # can be overridden in DB/query section
+    metric_expiration_time: 0s  # if all query attempts during this time were failed,
+                                # then metric should be excluded from the output 
+                                # until first successful query execution
     backoff_interval: 10s # default interval between failed connection attempts
     max_backoff_interval: 300s # every time after failed connection to the DB
                               # interval between connection attempts increases 
@@ -216,6 +224,9 @@ sources:
       - name: ""  # DB name, mandatory
         scrape_interval: 30m  # the same as above, applied to all queries of the DB, optional
         query_timeout: 10s    # the same as above, applied to all queries of the DB, optional
+        metric_expiration_time: 0s  # if all query attempts during this time were failed,
+                                    # then metric should be excluded from the output 
+                                    # until first successful query execution
         backoff_interval: 10s # default interval between failed connection attempts
         max_backoff_interval: 300s # every time after failed connection to the DB
                                   # interval between connection attempts increases 
@@ -229,6 +240,9 @@ sources:
                             # if metric_prefix is empty, metric_name is used to form final name of the metric
             scrape_interval: 30m  # the same as above, applied to this query, optional
             query_timeout: 10s    # the same as above, applied to this query, optional
+            metric_expiration_time: 0s  # if all query attempts during this time were failed,
+                                        # then metric should be excluded from the output 
+                                        # until first successful query execution
             metric_prefix: ""     # the same as above, applied to this query, optional
 
             # All values below are just for example, it's not default values.

@@ -1,14 +1,15 @@
 use crate::db::PostgresConnection;
-use crate::scrape_config::{ScrapeConfig, ScrapeConfigDatabase, ScrapeConfigValues};
+use crate::scrape_config::{
+    FieldType, ScrapeConfig, ScrapeConfigDatabase, ScrapeConfigQuery, ScrapeConfigValues,
+};
 
-use prometheus::core::GenericGauge;
-use prometheus::core::{AtomicF64, AtomicI64, GenericGaugeVec};
-use prometheus::{Encoder, TextEncoder};
+use prometheus::core::{AtomicF64, AtomicI64, Collector, GenericGauge, GenericGaugeVec};
+use prometheus::{opts, Encoder, Gauge, GaugeVec, IntGauge, IntGaugeVec, Registry, TextEncoder};
 use tokio::sync::mpsc;
 use tokio_postgres::Row;
 
 use std::convert::Infallible;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 use tracing::{debug, error, warn};
 
@@ -18,6 +19,229 @@ pub enum MetricWithType {
     SingleFloat(GenericGauge<AtomicF64>),
     VectorInt(GenericGaugeVec<AtomicI64>),
     VectorFloat(GenericGaugeVec<AtomicF64>),
+}
+
+struct QueryMetrics {
+    metrics: Vec<MetricWithType>,
+    is_registered: bool,
+    last_updated: SystemTime,
+}
+
+impl QueryMetrics {
+    fn from(query_config: &ScrapeConfigQuery) -> Self {
+        let mut metrics: Vec<MetricWithType>;
+
+        match &query_config.values {
+            ScrapeConfigValues::ValueFrom(values) => {
+                let mut opts = opts!(
+                    query_config.metric_name.clone(),
+                    query_config.metric_name.clone()
+                );
+                if let Some(const_labels) = &query_config.const_labels {
+                    opts = opts.const_labels(const_labels.clone());
+                }
+                if let Some(var_labels) = &query_config.var_labels {
+                    let new_labels: Vec<&str> = var_labels.iter().map(AsRef::as_ref).collect();
+                    metrics = match values.field_type {
+                        FieldType::Int => {
+                            let metric = IntGaugeVec::new(opts, &new_labels).unwrap_or_else(|_| {
+                                panic!("error while creating metric {}", query_config.metric_name)
+                            });
+                            vec![MetricWithType::VectorInt(metric)]
+                        }
+                        FieldType::Float => {
+                            let metric = GaugeVec::new(opts, &new_labels).unwrap_or_else(|_| {
+                                panic!("error while creating metric {}", query_config.metric_name)
+                            });
+                            vec![MetricWithType::VectorFloat(metric)]
+                        }
+                    }
+                } else {
+                    metrics = match values.field_type {
+                        FieldType::Int => {
+                            let metric = IntGauge::with_opts(opts).unwrap_or_else(|_| {
+                                panic!("error while creating metric {}", query_config.metric_name)
+                            });
+                            vec![MetricWithType::SingleInt(metric)]
+                        }
+                        FieldType::Float => {
+                            let metric = Gauge::with_opts(opts).unwrap_or_else(|_| {
+                                panic!("error while creating metric {}", query_config.metric_name)
+                            });
+                            vec![MetricWithType::SingleFloat(metric)]
+                        }
+                    };
+                }
+            }
+
+            ScrapeConfigValues::ValuesWithLabels(values) => {
+                metrics = vec![];
+
+                for value in values {
+                    let mut opts = opts!(
+                        query_config.metric_name.clone(),
+                        query_config.metric_name.clone()
+                    );
+                    if let Some(const_labels) = &query_config.const_labels {
+                        let mut const_labels = const_labels.clone();
+                        value.labels.iter().for_each(|(k, v)| {
+                            const_labels.insert(k.to_string(), v.to_string());
+                        });
+                        opts = opts.const_labels(const_labels);
+                    }
+                    let new_metric = if let Some(var_labels) = &query_config.var_labels {
+                        let new_labels: Vec<&str> = var_labels.iter().map(AsRef::as_ref).collect();
+                        match value.field_type {
+                            FieldType::Int => {
+                                let metric =
+                                    IntGaugeVec::new(opts, &new_labels).unwrap_or_else(|_| {
+                                        panic!(
+                                            "error while creating metric {}",
+                                            query_config.metric_name
+                                        )
+                                    });
+                                MetricWithType::VectorInt(metric)
+                            }
+                            FieldType::Float => {
+                                let metric =
+                                    GaugeVec::new(opts, &new_labels).unwrap_or_else(|_| {
+                                        panic!(
+                                            "error while creating metric {}",
+                                            query_config.metric_name
+                                        )
+                                    });
+                                MetricWithType::VectorFloat(metric)
+                            }
+                        }
+                    } else {
+                        match value.field_type {
+                            FieldType::Int => {
+                                let metric = IntGauge::with_opts(opts).unwrap_or_else(|_| {
+                                    panic!(
+                                        "error while creating metric {}",
+                                        query_config.metric_name
+                                    )
+                                });
+                                MetricWithType::SingleInt(metric)
+                            }
+                            FieldType::Float => {
+                                let metric = Gauge::with_opts(opts).unwrap_or_else(|_| {
+                                    panic!(
+                                        "error while creating metric {}",
+                                        query_config.metric_name
+                                    )
+                                });
+                                MetricWithType::SingleFloat(metric)
+                            }
+                        }
+                    };
+
+                    metrics.push(new_metric);
+                }
+            }
+
+            ScrapeConfigValues::ValuesWithSuffixes(values) => {
+                metrics = vec![];
+
+                for value in values {
+                    let metric_name = format!("{}_{}", query_config.metric_name, value.suffix);
+                    let mut opts = opts!(metric_name.clone(), metric_name.clone());
+                    if let Some(const_labels) = &query_config.const_labels {
+                        opts = opts.const_labels(const_labels.clone());
+                    }
+                    let new_metric = if let Some(var_labels) = &query_config.var_labels {
+                        let new_labels: Vec<&str> = var_labels.iter().map(AsRef::as_ref).collect();
+                        match value.field_type {
+                            FieldType::Int => {
+                                let metric =
+                                    IntGaugeVec::new(opts, &new_labels).unwrap_or_else(|_| {
+                                        panic!(
+                                            "error while creating metric {}",
+                                            query_config.metric_name
+                                        )
+                                    });
+                                MetricWithType::VectorInt(metric)
+                            }
+                            FieldType::Float => {
+                                let metric =
+                                    GaugeVec::new(opts, &new_labels).unwrap_or_else(|_| {
+                                        panic!(
+                                            "error while creating metric {}",
+                                            query_config.metric_name
+                                        )
+                                    });
+                                MetricWithType::VectorFloat(metric)
+                            }
+                        }
+                    } else {
+                        match value.field_type {
+                            FieldType::Int => {
+                                let metric = IntGauge::with_opts(opts).unwrap_or_else(|_| {
+                                    panic!(
+                                        "error while creating metric {}",
+                                        query_config.metric_name
+                                    )
+                                });
+                                MetricWithType::SingleInt(metric)
+                            }
+                            FieldType::Float => {
+                                let metric = Gauge::with_opts(opts).unwrap_or_else(|_| {
+                                    panic!(
+                                        "error while creating metric {}",
+                                        query_config.metric_name
+                                    )
+                                });
+                                MetricWithType::SingleFloat(metric)
+                            }
+                        }
+                    };
+
+                    metrics.push(new_metric);
+                }
+            }
+        };
+
+        QueryMetrics {
+            metrics,
+            is_registered: false,
+            last_updated: SystemTime::now() - query_config.metric_expiration_time,
+        }
+    }
+
+    fn register(&mut self, registry: &Registry) {
+        self.last_updated = SystemTime::now();
+        if !self.is_registered {
+            for metric in self.metrics.iter() {
+                let metric: Box<dyn Collector> = match metric {
+                    MetricWithType::SingleInt(m) => Box::new(m.to_owned()),
+                    MetricWithType::SingleFloat(m) => Box::new(m.to_owned()),
+                    MetricWithType::VectorInt(m) => Box::new(m.to_owned()),
+                    MetricWithType::VectorFloat(m) => Box::new(m.to_owned()),
+                };
+                registry
+                    .register(metric)
+                    .unwrap_or_else(|_| panic!("error while registering metric"));
+            }
+            self.is_registered = true;
+        };
+    }
+
+    fn unregister(&mut self, registry: &Registry) {
+        if self.is_registered {
+            for metric in self.metrics.iter() {
+                let metric: Box<dyn Collector> = match metric {
+                    MetricWithType::SingleInt(m) => Box::new(m.to_owned()),
+                    MetricWithType::SingleFloat(m) => Box::new(m.to_owned()),
+                    MetricWithType::VectorInt(m) => Box::new(m.to_owned()),
+                    MetricWithType::VectorFloat(m) => Box::new(m.to_owned()),
+                };
+                registry
+                    .unregister(metric)
+                    .unwrap_or_else(|_| panic!("error while un-registering metric"));
+            }
+            self.is_registered = false;
+        };
+    }
 }
 
 pub async fn compose_reply() -> Result<impl warp::Reply, Infallible> {
@@ -65,41 +289,73 @@ async fn collect_one_db_instance(mut database: ScrapeConfigDatabase) {
     .await
     .expect("can't create db connection due to some fatal errors");
 
+    let registry = prometheus::default_registry();
+    let mut query_metrics: Vec<QueryMetrics> = Vec::with_capacity(database.queries.len());
+    database
+        .queries
+        .iter()
+        .for_each(|q| query_metrics.push(QueryMetrics::from(q)));
+
     loop {
-        for item in database.queries.iter_mut() {
-            if item.next_query_time > SystemTime::now() {
+        for (query_item, index) in database.queries.iter_mut().zip(0..query_metrics.len()) {
+            if query_item.next_query_time > SystemTime::now() {
                 continue;
             }
 
-            let var_labels = &item.var_labels;
-            let values = &item.values;
-            let query = &item.query;
+            let var_labels = &query_item.var_labels;
+            let values = &query_item.values;
+            let query = &query_item.query;
 
-            let result = db_connection.query(query, item.query_timeout).await;
+            let result = db_connection.query(query, query_item.query_timeout).await;
 
             match result {
-                Ok(result) => match values {
-                    ScrapeConfigValues::ValueFrom(value) => {
-                        if let Some(field) = &value.field {
-                            update_metrics(&result, Some(field), var_labels, &item.metric[0])
-                        } else {
-                            update_metrics(&result, None, var_labels, &item.metric[0])
+                Ok(result) => {
+                    query_metrics[index].register(registry);
+                    match values {
+                        ScrapeConfigValues::ValueFrom(value) => {
+                            if let Some(field) = &value.field {
+                                update_metrics(
+                                    &result,
+                                    Some(field),
+                                    var_labels,
+                                    &query_metrics[index].metrics[0],
+                                )
+                            } else {
+                                update_metrics(
+                                    &result,
+                                    None,
+                                    var_labels,
+                                    &query_metrics[index].metrics[0],
+                                )
+                            }
+                        }
+                        ScrapeConfigValues::ValuesWithLabels(values) => {
+                            for (value, metric) in values.iter().zip(&query_metrics[index].metrics)
+                            {
+                                update_metrics(&result, Some(&value.field), var_labels, metric)
+                            }
+                        }
+                        ScrapeConfigValues::ValuesWithSuffixes(values) => {
+                            for (value, metric) in values.iter().zip(&query_metrics[index].metrics)
+                            {
+                                update_metrics(&result, Some(&value.field), var_labels, metric)
+                            }
                         }
                     }
-                    ScrapeConfigValues::ValuesWithLabels(values) => {
-                        for (value, metric) in values.iter().zip(&item.metric) {
-                            update_metrics(&result, Some(&value.field), var_labels, metric)
+                }
+                Err(e) => {
+                    if query_item.metric_expiration_time != Duration::ZERO {
+                        let expiration_time =
+                            query_metrics[index].last_updated + query_item.metric_expiration_time;
+                        if SystemTime::now() > expiration_time {
+                            debug!("deregister metrics as expired");
+                            query_metrics[index].unregister(registry);
                         }
                     }
-                    ScrapeConfigValues::ValuesWithSuffixes(values) => {
-                        for (value, metric) in values.iter().zip(&item.metric) {
-                            update_metrics(&result, Some(&value.field), var_labels, metric)
-                        }
-                    }
-                },
-                Err(e) => error!("{e}"),
+                    error!("{e}")
+                }
             };
-            item.next_query_time = item.schedule_next_query_time();
+            query_item.next_query_time = query_item.schedule_next_query_time();
         }
 
         let next_query_time = database
