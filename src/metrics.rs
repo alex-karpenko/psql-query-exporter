@@ -4,7 +4,9 @@ use crate::scrape_config::{
 };
 
 use prometheus::core::{AtomicF64, AtomicI64, Collector, GenericGauge, GenericGaugeVec};
-use prometheus::{opts, Encoder, Gauge, GaugeVec, IntGauge, IntGaugeVec, Registry, TextEncoder};
+use prometheus::{
+    opts, Encoder, Gauge, GaugeVec, IntGauge, IntGaugeVec, Opts, Registry, TextEncoder,
+};
 use tokio::sync::mpsc;
 use tokio_postgres::Row;
 
@@ -21,6 +23,17 @@ pub enum MetricWithType {
     VectorFloat(GenericGaugeVec<AtomicF64>),
 }
 
+impl MetricWithType {
+    fn to_collector(&self) -> Box<dyn Collector> {
+        match self {
+            MetricWithType::SingleInt(m) => Box::new(m.to_owned()),
+            MetricWithType::SingleFloat(m) => Box::new(m.to_owned()),
+            MetricWithType::VectorInt(m) => Box::new(m.to_owned()),
+            MetricWithType::VectorFloat(m) => Box::new(m.to_owned()),
+        }
+    }
+}
+
 struct QueryMetrics {
     metrics: Vec<MetricWithType>,
     is_registered: bool,
@@ -30,59 +43,33 @@ struct QueryMetrics {
 
 impl QueryMetrics {
     fn from(query_config: &ScrapeConfigQuery) -> Self {
-        let mut metrics: Vec<MetricWithType>;
+        let mut metrics: Vec<MetricWithType> = vec![];
 
         match &query_config.values {
             ScrapeConfigValues::ValueFrom(values) => {
-                let mut opts = opts!(
-                    query_config.metric_name.clone(),
-                    query_config.metric_name.clone()
-                );
+                let metric_name = query_config.metric_name.clone();
+                let metric_desc = query_config.metric_name.clone();
+                let mut opts = opts!(metric_name, metric_desc);
+
                 if let Some(const_labels) = &query_config.const_labels {
                     opts = opts.const_labels(const_labels.clone());
                 }
-                if let Some(var_labels) = &query_config.var_labels {
-                    let new_labels: Vec<&str> = var_labels.iter().map(AsRef::as_ref).collect();
-                    metrics = match values.field_type {
-                        FieldType::Int => {
-                            let metric = IntGaugeVec::new(opts, &new_labels).unwrap_or_else(|_| {
-                                panic!("error while creating metric {}", query_config.metric_name)
-                            });
-                            vec![MetricWithType::VectorInt(metric)]
-                        }
-                        FieldType::Float => {
-                            let metric = GaugeVec::new(opts, &new_labels).unwrap_or_else(|_| {
-                                panic!("error while creating metric {}", query_config.metric_name)
-                            });
-                            vec![MetricWithType::VectorFloat(metric)]
-                        }
-                    }
-                } else {
-                    metrics = match values.field_type {
-                        FieldType::Int => {
-                            let metric = IntGauge::with_opts(opts).unwrap_or_else(|_| {
-                                panic!("error while creating metric {}", query_config.metric_name)
-                            });
-                            vec![MetricWithType::SingleInt(metric)]
-                        }
-                        FieldType::Float => {
-                            let metric = Gauge::with_opts(opts).unwrap_or_else(|_| {
-                                panic!("error while creating metric {}", query_config.metric_name)
-                            });
-                            vec![MetricWithType::SingleFloat(metric)]
-                        }
-                    };
-                }
+
+                let new_metric =
+                    Self::helper_create_metric(&query_config.var_labels, &values.field_type, opts)
+                        .unwrap_or_else(|_| {
+                            panic!("error while creating metric {}", query_config.metric_name)
+                        });
+
+                metrics.push(new_metric);
             }
 
             ScrapeConfigValues::ValuesWithLabels(values) => {
-                metrics = vec![];
-
                 for value in values {
-                    let mut opts = opts!(
-                        query_config.metric_name.clone(),
-                        query_config.metric_name.clone()
-                    );
+                    let metric_name = query_config.metric_name.clone();
+                    let metric_desc = query_config.metric_name.clone();
+                    let mut opts = opts!(metric_name, metric_desc);
+
                     if let Some(const_labels) = &query_config.const_labels {
                         let mut const_labels = const_labels.clone();
                         value.labels.iter().for_each(|(k, v)| {
@@ -90,112 +77,36 @@ impl QueryMetrics {
                         });
                         opts = opts.const_labels(const_labels);
                     }
-                    let new_metric = if let Some(var_labels) = &query_config.var_labels {
-                        let new_labels: Vec<&str> = var_labels.iter().map(AsRef::as_ref).collect();
-                        match value.field_type {
-                            FieldType::Int => {
-                                let metric =
-                                    IntGaugeVec::new(opts, &new_labels).unwrap_or_else(|_| {
-                                        panic!(
-                                            "error while creating metric {}",
-                                            query_config.metric_name
-                                        )
-                                    });
-                                MetricWithType::VectorInt(metric)
-                            }
-                            FieldType::Float => {
-                                let metric =
-                                    GaugeVec::new(opts, &new_labels).unwrap_or_else(|_| {
-                                        panic!(
-                                            "error while creating metric {}",
-                                            query_config.metric_name
-                                        )
-                                    });
-                                MetricWithType::VectorFloat(metric)
-                            }
-                        }
-                    } else {
-                        match value.field_type {
-                            FieldType::Int => {
-                                let metric = IntGauge::with_opts(opts).unwrap_or_else(|_| {
-                                    panic!(
-                                        "error while creating metric {}",
-                                        query_config.metric_name
-                                    )
-                                });
-                                MetricWithType::SingleInt(metric)
-                            }
-                            FieldType::Float => {
-                                let metric = Gauge::with_opts(opts).unwrap_or_else(|_| {
-                                    panic!(
-                                        "error while creating metric {}",
-                                        query_config.metric_name
-                                    )
-                                });
-                                MetricWithType::SingleFloat(metric)
-                            }
-                        }
-                    };
+                    let new_metric = Self::helper_create_metric(
+                        &query_config.var_labels,
+                        &value.field_type,
+                        opts,
+                    )
+                    .unwrap_or_else(|_| {
+                        panic!("error while creating metric {}", query_config.metric_name)
+                    });
 
                     metrics.push(new_metric);
                 }
             }
 
             ScrapeConfigValues::ValuesWithSuffixes(values) => {
-                metrics = vec![];
-
                 for value in values {
                     let metric_name = format!("{}_{}", query_config.metric_name, value.suffix);
-                    let mut opts = opts!(metric_name.clone(), metric_name.clone());
+                    let metric_desc = metric_name.clone();
+                    let mut opts = opts!(metric_name, metric_desc);
+
                     if let Some(const_labels) = &query_config.const_labels {
                         opts = opts.const_labels(const_labels.clone());
                     }
-                    let new_metric = if let Some(var_labels) = &query_config.var_labels {
-                        let new_labels: Vec<&str> = var_labels.iter().map(AsRef::as_ref).collect();
-                        match value.field_type {
-                            FieldType::Int => {
-                                let metric =
-                                    IntGaugeVec::new(opts, &new_labels).unwrap_or_else(|_| {
-                                        panic!(
-                                            "error while creating metric {}",
-                                            query_config.metric_name
-                                        )
-                                    });
-                                MetricWithType::VectorInt(metric)
-                            }
-                            FieldType::Float => {
-                                let metric =
-                                    GaugeVec::new(opts, &new_labels).unwrap_or_else(|_| {
-                                        panic!(
-                                            "error while creating metric {}",
-                                            query_config.metric_name
-                                        )
-                                    });
-                                MetricWithType::VectorFloat(metric)
-                            }
-                        }
-                    } else {
-                        match value.field_type {
-                            FieldType::Int => {
-                                let metric = IntGauge::with_opts(opts).unwrap_or_else(|_| {
-                                    panic!(
-                                        "error while creating metric {}",
-                                        query_config.metric_name
-                                    )
-                                });
-                                MetricWithType::SingleInt(metric)
-                            }
-                            FieldType::Float => {
-                                let metric = Gauge::with_opts(opts).unwrap_or_else(|_| {
-                                    panic!(
-                                        "error while creating metric {}",
-                                        query_config.metric_name
-                                    )
-                                });
-                                MetricWithType::SingleFloat(metric)
-                            }
-                        }
-                    };
+                    let new_metric = Self::helper_create_metric(
+                        &query_config.var_labels,
+                        &value.field_type,
+                        opts,
+                    )
+                    .unwrap_or_else(|_| {
+                        panic!("error while creating metric {}", query_config.metric_name)
+                    });
 
                     metrics.push(new_metric);
                 }
@@ -210,16 +121,42 @@ impl QueryMetrics {
         }
     }
 
+    fn helper_create_metric(
+        var_labels: &Option<Vec<String>>,
+        field_type: &FieldType,
+        opts: Opts,
+    ) -> Result<MetricWithType, ()> {
+        if let Some(var_labels) = var_labels {
+            let new_labels: Vec<&str> = var_labels.iter().map(AsRef::as_ref).collect();
+            match field_type {
+                FieldType::Int => {
+                    let metric = IntGaugeVec::new(opts, &new_labels).unwrap();
+                    Ok(MetricWithType::VectorInt(metric))
+                }
+                FieldType::Float => {
+                    let metric = GaugeVec::new(opts, &new_labels).unwrap();
+                    Ok(MetricWithType::VectorFloat(metric))
+                }
+            }
+        } else {
+            match field_type {
+                FieldType::Int => {
+                    let metric = IntGauge::with_opts(opts).unwrap();
+                    Ok(MetricWithType::SingleInt(metric))
+                }
+                FieldType::Float => {
+                    let metric = Gauge::with_opts(opts).unwrap();
+                    Ok(MetricWithType::SingleFloat(metric))
+                }
+            }
+        }
+    }
+
     fn register(&mut self, registry: &Registry) {
         self.last_updated = SystemTime::now();
         if !self.is_registered {
             for metric in self.metrics.iter() {
-                let metric: Box<dyn Collector> = match metric {
-                    MetricWithType::SingleInt(m) => Box::new(m.to_owned()),
-                    MetricWithType::SingleFloat(m) => Box::new(m.to_owned()),
-                    MetricWithType::VectorInt(m) => Box::new(m.to_owned()),
-                    MetricWithType::VectorFloat(m) => Box::new(m.to_owned()),
-                };
+                let metric = metric.to_collector();
                 registry
                     .register(metric)
                     .unwrap_or_else(|_| panic!("error while registering metric"));
@@ -231,12 +168,7 @@ impl QueryMetrics {
     fn unregister(&mut self, registry: &Registry) {
         if self.is_registered {
             for metric in self.metrics.iter() {
-                let metric: Box<dyn Collector> = match metric {
-                    MetricWithType::SingleInt(m) => Box::new(m.to_owned()),
-                    MetricWithType::SingleFloat(m) => Box::new(m.to_owned()),
-                    MetricWithType::VectorInt(m) => Box::new(m.to_owned()),
-                    MetricWithType::VectorFloat(m) => Box::new(m.to_owned()),
-                };
+                let metric = metric.to_collector();
                 registry
                     .unregister(metric)
                     .unwrap_or_else(|_| panic!("error while un-registering metric"));
