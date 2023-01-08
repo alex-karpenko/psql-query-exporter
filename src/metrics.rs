@@ -47,9 +47,10 @@ impl QueryMetrics {
 
         match &query_config.values {
             ScrapeConfigValues::ValueFrom(values) => {
-                let metric_name = query_config.metric_name.clone();
-                let metric_desc = query_config.metric_name.clone();
-                let mut opts = opts!(metric_name, metric_desc);
+                let mut opts = opts!(
+                    query_config.metric_name.clone(),
+                    query_config.description.clone().unwrap()
+                );
 
                 if let Some(const_labels) = &query_config.const_labels {
                     opts = opts.const_labels(const_labels.clone());
@@ -69,9 +70,10 @@ impl QueryMetrics {
 
             ScrapeConfigValues::ValuesWithLabels(values) => {
                 for value in values {
-                    let metric_name = query_config.metric_name.clone();
-                    let metric_desc = query_config.metric_name.clone();
-                    let mut opts = opts!(metric_name, metric_desc);
+                    let mut opts = opts!(
+                        query_config.metric_name.clone(),
+                        query_config.description.clone().unwrap()
+                    );
 
                     if let Some(const_labels) = &query_config.const_labels {
                         let mut const_labels = const_labels.clone();
@@ -99,7 +101,11 @@ impl QueryMetrics {
             ScrapeConfigValues::ValuesWithSuffixes(values) => {
                 for value in values {
                     let metric_name = format!("{}_{}", query_config.metric_name, value.suffix);
-                    let metric_desc = metric_name.clone();
+                    let metric_desc = format!(
+                        "{}: {}",
+                        query_config.description.clone().unwrap(),
+                        value.suffix
+                    );
                     let mut opts = opts!(metric_name, metric_desc);
 
                     if let Some(const_labels) = &query_config.const_labels {

@@ -84,6 +84,7 @@ config:
         - dbname: postgres
           queries:
             - metric_name: replication_lag
+              description: Storage size and state of replication slots
               query: |
                 select slot_name, slot_type, active::text, 
                 (case when not pg_is_in_recovery() then pg_current_wal_lsn() - restart_lsn end)::float as lag_bytes
@@ -236,6 +237,9 @@ sources:
 
         queries:  # list of queries to run against this particular instance/db, mandatory
           - query: "" # query string, mandatory
+            description: "" # Metric's description, it will be presented in HELP part of the metric's output
+                            # If metric has multi_suffixes (see below) than suffix will be added to the description after semicolon
+                            # Default is metric's name
             metric_name: "" # name that will be joined with the metric_prefix and underscore, mandatory
                             # if metric_prefix is empty, metric_name is used to form final name of the metric
             scrape_interval: 30m  # the same as above, applied to this query, optional

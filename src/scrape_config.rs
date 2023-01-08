@@ -93,6 +93,7 @@ pub struct ScrapeConfigDatabase {
 pub struct ScrapeConfigQuery {
     pub query: String,
     pub metric_name: String,
+    pub description: Option<String>,
     metric_prefix: Option<String>,
     #[serde(with = "humantime_serde", default)]
     pub scrape_interval: Duration,
@@ -353,6 +354,10 @@ impl ScrapeConfigQuery {
 
         if let Some(prefix) = &self.metric_prefix {
             self.metric_name = format!("{}_{}", prefix, self.metric_name);
+        }
+
+        if self.description.is_none() {
+            self.description = Some(self.metric_name.clone())
         }
     }
 }
