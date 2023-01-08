@@ -385,22 +385,22 @@ async fn collect_one_db_instance(database: ScrapeConfigDatabase) {
 }
 
 fn update_metrics(
-    rows: &Vec<Row>,
-    field: Option<&String>,
+    rows: &[Row],
+    field: Option<&str>,
     var_labels: &Option<Vec<String>>,
     metric: &MetricWithType,
 ) {
     match metric {
         MetricWithType::SingleInt(metric) => {
             if let Some(field) = field {
-                metric.set(rows[0].get(field.as_str()))
+                metric.set(rows[0].get(field))
             } else {
                 metric.set(rows[0].get(0))
             }
         }
         MetricWithType::SingleFloat(metric) => {
             if let Some(field) = field {
-                metric.set(rows[0].get(field.as_str()))
+                metric.set(rows[0].get(field))
             } else {
                 metric.set(rows[0].get(0))
             }
@@ -415,9 +415,7 @@ fn update_metrics(
                     let new_labels: Vec<&str> = new_labels.iter().map(AsRef::as_ref).collect();
                     let new_labels: &[&str] = new_labels.as_slice();
                     if let Some(field) = field {
-                        metric
-                            .with_label_values(new_labels)
-                            .set(row.get(field.as_str()));
+                        metric.with_label_values(new_labels).set(row.get(field));
                     } else {
                         metric.with_label_values(new_labels).set(row.get(0));
                     }
@@ -434,9 +432,7 @@ fn update_metrics(
                     let new_labels: Vec<&str> = new_labels.iter().map(AsRef::as_ref).collect();
                     let new_labels: &[&str] = new_labels.as_slice();
                     if let Some(field) = field {
-                        metric
-                            .with_label_values(new_labels)
-                            .set(row.get(field.as_str()));
+                        metric.with_label_values(new_labels).set(row.get(field));
                     } else {
                         metric.with_label_values(new_labels).set(row.get(0));
                     }
