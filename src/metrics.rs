@@ -57,8 +57,11 @@ impl QueryMetrics {
 
                 let new_metric =
                     Self::helper_create_metric(&query_config.var_labels, &values.field_type, opts)
-                        .unwrap_or_else(|_| {
-                            panic!("error while creating metric {}", query_config.metric_name)
+                        .unwrap_or_else(|e| {
+                            panic!(
+                                "error while creating metric {}: {}",
+                                query_config.metric_name, e
+                            )
                         });
 
                 metrics.push(new_metric);
@@ -82,8 +85,11 @@ impl QueryMetrics {
                         &value.field_type,
                         opts,
                     )
-                    .unwrap_or_else(|_| {
-                        panic!("error while creating metric {}", query_config.metric_name)
+                    .unwrap_or_else(|e| {
+                        panic!(
+                            "error while creating metric {}: {}",
+                            query_config.metric_name, e
+                        )
                     });
 
                     metrics.push(new_metric);
@@ -104,8 +110,11 @@ impl QueryMetrics {
                         &value.field_type,
                         opts,
                     )
-                    .unwrap_or_else(|_| {
-                        panic!("error while creating metric {}", query_config.metric_name)
+                    .unwrap_or_else(|e| {
+                        panic!(
+                            "error while creating metric {}: {}",
+                            query_config.metric_name, e
+                        )
                     });
 
                     metrics.push(new_metric);
@@ -125,29 +134,23 @@ impl QueryMetrics {
         var_labels: &Option<Vec<String>>,
         field_type: &FieldType,
         opts: Opts,
-    ) -> Result<MetricWithType, ()> {
+    ) -> Result<MetricWithType, prometheus::Error> {
         if let Some(var_labels) = var_labels {
             let new_labels: Vec<&str> = var_labels.iter().map(AsRef::as_ref).collect();
             match field_type {
-                FieldType::Int => {
-                    let metric = IntGaugeVec::new(opts, &new_labels).unwrap();
-                    Ok(MetricWithType::VectorInt(metric))
-                }
-                FieldType::Float => {
-                    let metric = GaugeVec::new(opts, &new_labels).unwrap();
-                    Ok(MetricWithType::VectorFloat(metric))
-                }
+                FieldType::Int => Ok(MetricWithType::VectorInt(IntGaugeVec::new(
+                    opts,
+                    &new_labels,
+                )?)),
+                FieldType::Float => Ok(MetricWithType::VectorFloat(GaugeVec::new(
+                    opts,
+                    &new_labels,
+                )?)),
             }
         } else {
             match field_type {
-                FieldType::Int => {
-                    let metric = IntGauge::with_opts(opts).unwrap();
-                    Ok(MetricWithType::SingleInt(metric))
-                }
-                FieldType::Float => {
-                    let metric = Gauge::with_opts(opts).unwrap();
-                    Ok(MetricWithType::SingleFloat(metric))
-                }
+                FieldType::Int => Ok(MetricWithType::SingleInt(IntGauge::with_opts(opts)?)),
+                FieldType::Float => Ok(MetricWithType::SingleFloat(Gauge::with_opts(opts)?)),
             }
         }
     }
@@ -159,7 +162,7 @@ impl QueryMetrics {
                 let metric = metric.to_collector();
                 registry
                     .register(metric)
-                    .unwrap_or_else(|_| panic!("error while registering metric"));
+                    .unwrap_or_else(|e| panic!("error while registering metric: {e}"));
             }
             self.is_registered = true;
         };
@@ -171,7 +174,7 @@ impl QueryMetrics {
                 let metric = metric.to_collector();
                 registry
                     .unregister(metric)
-                    .unwrap_or_else(|_| panic!("error while un-registering metric"));
+                    .unwrap_or_else(|e| panic!("error while un-registering metric: {e}"));
             }
             self.is_registered = false;
         };
@@ -187,9 +190,9 @@ pub async fn compose_reply() -> Result<impl warp::Reply, Infallible> {
     let metric_families = registry.gather();
     encoder
         .encode(&metric_families, &mut buffer)
-        .expect("looks like a BUG");
+        .unwrap_or_else(|e| panic!("looks like a BUG: {e}"));
 
-    Ok(String::from_utf8(buffer).expect("looks like a BUG"))
+    Ok(String::from_utf8(buffer).unwrap_or_else(|e| panic!("looks like a BUG: {e}")))
 }
 
 pub async fn collecting_task(scrape_config: ScrapeConfig) {
@@ -221,7 +224,7 @@ async fn collect_one_db_instance(database: ScrapeConfigDatabase) {
         database.max_backoff_interval,
     )
     .await
-    .expect("can't create db connection due to some fatal errors");
+    .unwrap_or_else(|e| panic!("can't create db connection: {e}"));
 
     let registry = prometheus::default_registry();
     let mut query_metrics: Vec<QueryMetrics> = Vec::with_capacity(database.queries.len());
@@ -309,7 +312,7 @@ async fn collect_one_db_instance(database: ScrapeConfigDatabase) {
             tokio::time::sleep(
                 next_query_time
                     .duration_since(SystemTime::now())
-                    .expect("looks like a BUG"),
+                    .unwrap_or_else(|e| panic!("looks like a BUG: {e}")),
             )
             .await;
         }

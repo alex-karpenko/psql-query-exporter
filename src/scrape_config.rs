@@ -258,7 +258,8 @@ impl ScrapeConfigSource {
     }
 
     fn apply_envs_to_string(&self, text: &str) -> String {
-        let re = Regex::new(r"\$\{[a-zA-Z][A-Za-z0-9_]*\}").expect("looks like a BUG");
+        let re = Regex::new(r"\$\{[a-zA-Z][A-Za-z0-9_]*\}")
+            .unwrap_or_else(|e| panic!("looks like a BUG: {e}"));
         let mut result = text.to_owned();
         for item in re.captures_iter(text) {
             let env_name = item.get(0).expect("looks like a BUG").as_str().to_string();

@@ -48,5 +48,5 @@ async fn shutdown() {
     // Wait for the CTRL+C signal
     signal::ctrl_c()
         .await
-        .expect("failed to install termination signal handler");
+        .unwrap_or_else(|e| panic!("can't install termination signal handler: {e}"));
 }
