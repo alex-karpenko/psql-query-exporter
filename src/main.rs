@@ -17,7 +17,7 @@ const HOME_PAGE_CONTENT: &str = include_str!("../assets/index.html");
 #[instrument]
 async fn main() -> Result<(), Box<dyn Error>> {
     let app_config = AppConfig::new();
-    let scrape_config = ScrapeConfig::new(&app_config.config);
+    let scrape_config = ScrapeConfig::from(&app_config.config);
 
     // GET /
     let home_route = warp::path::end().map(|| warp::reply::html(HOME_PAGE_CONTENT));

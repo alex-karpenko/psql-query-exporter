@@ -119,11 +119,7 @@ impl PostgresConnection {
         }
     }
 
-    pub async fn query(
-        &mut self,
-        query: &String,
-        query_timeout: Duration,
-    ) -> Result<Vec<Row>, Error> {
+    pub async fn query(&mut self, query: &str, query_timeout: Duration) -> Result<Vec<Row>, Error> {
         debug!("PostgresConnection::query: {query:?}");
         let mut backoff_interval = self.default_backoff_interval;
 

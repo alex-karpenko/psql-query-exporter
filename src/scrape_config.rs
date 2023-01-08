@@ -153,7 +153,7 @@ pub enum FieldType {
 }
 
 impl ScrapeConfig {
-    pub fn new(filename: &PathBuf) -> ScrapeConfig {
+    pub fn from(filename: &PathBuf) -> ScrapeConfig {
         let config: Result<ScrapeConfig, Error> =
             Figment::new().merge(Yaml::file(filename)).extract();
 
