@@ -15,6 +15,8 @@ const DEFAULT_QUERY_TIMEOUT: Duration = Duration::from_secs(10);
 const DEFAULT_METRIC_EXPIRATION_TIME: Duration = Duration::ZERO;
 const DB_CONNECTION_DEFAULT_BACKOFF_INTERVAL: Duration = Duration::from_secs(10);
 const DB_CONNECTION_MAXIMUM_BACKOFF_INTERVAL: Duration = Duration::from_secs(300);
+const DB_APP_NAME: &str = env!("CARGO_PKG_NAME");
+const DB_APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -247,7 +249,7 @@ impl ScrapeConfigSource {
         };
 
         self.databases.iter_mut().for_each(|db| {
-            let conn_string = format!("host={host} port={port} dbname={dbname} user={user} password='{password}' sslmode={sslmode}", host=self.host, port=self.port, user=self.user, password=self.password, sslmode=self.sslmode, dbname=db.dbname);
+            let conn_string = format!("host={host} port={port} dbname={dbname} user={user} password='{password}' sslmode={sslmode} application_name={DB_APP_NAME}-v{DB_APP_VERSION}", host=self.host, port=self.port, user=self.user, password=self.password, sslmode=self.sslmode, dbname=db.dbname);
             db.propagate_defaults(&defaults, conn_string);
         });
     }
