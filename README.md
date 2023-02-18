@@ -135,8 +135,12 @@ defaults:
   metric_prefix: ""     # prefix for metric name, 
                         # may be overridden by source/db/query config
 
-  ssl_verify: true      # if it's false and SSL is in use, 
-                        # than certificate verification will be omitted, 
+  sslmode: prefer       # SSL mode to connect to the DB, optional,
+                        # possible values are: disable, prefer, require, verify-ca and verify-full
+                        # may be overridden by source/db config
+
+  ssl_rootcert: ""      # path to additional root (CA) certificates file
+                        # should be in PEM format and may contain more than one certificate
                         # may be overridden by source/db config
 
   metric_expiration_time: 0s # if all query attempts during this time were failed,
@@ -164,7 +168,7 @@ So `sources` section is a dictionary, each key is mnemonic name of the source. E
 
 #### Sources definition
 
-In the `host`, `user` and `password` values environment variables can be used to set whole value of the field or part of it, by replacing `${NAME}` with value of the `NAME` environment variable. For example:
+In the `host`, `user`, `password` and `ssl_rootcert` values environment variables can be used to set whole value of the field or part of it, by replacing `${NAME}` with value of the `NAME` environment variable. For example:
 
 ```yaml
   host: db.${ENV_NAME}.example.com
@@ -200,7 +204,9 @@ sources:
     password: ""  # password to login to the DB, mandatory,
                   # environment variable can be used here
     sslmode: prefer   # SSL mode to connect to the DB, optional,
-                      # possible values are: disable, allow, prefer, require
+                      # possible values are: disable, prefer, require, verify-ca and verify-full
+    ssl_rootcert: ""  # path to additional root (CA) certificates file
+                      # should be in PEM format and may contain more than one certificate
     scrape_interval: 30m  # scrape interval for all DBs/queries of the source, optional,
                           # overrides value from the default section,
                           # can be overridden in DB/query section
@@ -217,8 +223,6 @@ sources:
                               # of the max_backoff_interval
     metric_prefix: "" # will be added to names of the all metrics for these DBs/queries, optional,
                       # overrides value from the default section,
-                      # can be overridden in DB/query section
-    ssl_verify: true  # overrides value from the default section, optional,
                       # can be overridden in DB/query section
 
     databases:   # list of the databases inside the instance, mandatory

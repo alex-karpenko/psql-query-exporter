@@ -15,6 +15,8 @@ const DEFAULT_QUERY_TIMEOUT: Duration = Duration::from_secs(10);
 const DEFAULT_METRIC_EXPIRATION_TIME: Duration = Duration::ZERO;
 const DB_CONNECTION_DEFAULT_BACKOFF_INTERVAL: Duration = Duration::from_secs(10);
 const DB_CONNECTION_MAXIMUM_BACKOFF_INTERVAL: Duration = Duration::from_secs(300);
+const DB_APP_NAME: &str = env!("CARGO_PKG_NAME");
+const DB_APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -38,7 +40,8 @@ struct ScrapeConfigDefaults {
     #[serde(with = "humantime_serde")]
     metric_expiration_time: Duration,
     metric_prefix: Option<String>,
-    ssl_verify: Option<bool>,
+    ssl_rootcert: Option<String>,
+    sslmode: PostgresSslMode,
 }
 
 #[derive(Deserialize, Debug)]
@@ -50,7 +53,7 @@ pub struct ScrapeConfigSource {
     user: String,
     password: String,
     #[serde(default)]
-    sslmode: PostgresSslMode,
+    sslmode: Option<PostgresSslMode>,
     #[serde(with = "humantime_serde", default)]
     scrape_interval: Duration,
     #[serde(with = "humantime_serde", default)]
@@ -62,7 +65,7 @@ pub struct ScrapeConfigSource {
     #[serde(with = "humantime_serde", default)]
     metric_expiration_time: Duration,
     metric_prefix: Option<String>,
-    ssl_verify: Option<bool>,
+    ssl_rootcert: Option<String>,
     pub databases: Vec<ScrapeConfigDatabase>,
 }
 
@@ -72,6 +75,8 @@ pub struct ScrapeConfigDatabase {
     pub dbname: String,
     #[serde(skip)]
     pub connection_string: String,
+    #[serde(skip)]
+    pub sslmode: Option<PostgresSslMode>,
     #[serde(with = "humantime_serde", default)]
     scrape_interval: Duration,
     #[serde(with = "humantime_serde", default)]
@@ -84,7 +89,7 @@ pub struct ScrapeConfigDatabase {
     metric_expiration_time: Duration,
     metric_prefix: Option<String>,
     #[serde(skip)]
-    pub ssl_verify: Option<bool>,
+    pub ssl_rootcert: Option<String>,
     pub queries: Vec<ScrapeConfigQuery>,
 }
 
@@ -188,7 +193,8 @@ impl Default for ScrapeConfigDefaults {
             max_backoff_interval: DB_CONNECTION_MAXIMUM_BACKOFF_INTERVAL,
             metric_expiration_time: DEFAULT_METRIC_EXPIRATION_TIME,
             metric_prefix: None,
-            ssl_verify: None,
+            ssl_rootcert: None,
+            sslmode: PostgresSslMode::default(),
         }
     }
 }
@@ -237,17 +243,24 @@ impl ScrapeConfigSource {
                 }
                 _ => self.metric_prefix.clone(),
             },
-            ssl_verify: match self.ssl_verify {
+            ssl_rootcert: match self.ssl_rootcert {
                 None => {
-                    self.ssl_verify = defaults.ssl_verify;
-                    defaults.ssl_verify
+                    self.ssl_rootcert = defaults.ssl_rootcert.clone();
+                    defaults.ssl_rootcert.clone()
                 }
-                _ => self.ssl_verify,
+                _ => self.ssl_rootcert.clone(),
+            },
+            sslmode: match self.sslmode {
+                None => {
+                    self.sslmode = Some(defaults.sslmode.clone());
+                    defaults.sslmode.clone()
+                }
+                _ => self.sslmode.clone().unwrap(),
             },
         };
 
         self.databases.iter_mut().for_each(|db| {
-            let conn_string = format!("host={host} port={port} dbname={dbname} user={user} password='{password}' sslmode={sslmode}", host=self.host, port=self.port, user=self.user, password=self.password, sslmode=self.sslmode, dbname=db.dbname);
+            let conn_string = format!("host={host} port={port} dbname={dbname} user={user} password='{password}' sslmode={sslmode} application_name={DB_APP_NAME}-v{DB_APP_VERSION}", host=self.host, port=self.port, user=self.user, password=self.password, sslmode=self.sslmode.clone().unwrap(), dbname=db.dbname);
             db.propagate_defaults(&defaults, conn_string);
         });
     }
@@ -256,6 +269,7 @@ impl ScrapeConfigSource {
         self.host = self.apply_envs_to_string(&self.host);
         self.user = self.apply_envs_to_string(&self.user);
         self.password = self.apply_envs_to_string(&self.password);
+        self.ssl_rootcert = Some(self.apply_envs_to_string(&self.ssl_rootcert.clone().unwrap()));
     }
 
     fn apply_envs_to_string(&self, text: &str) -> String {
@@ -315,12 +329,19 @@ impl ScrapeConfigDatabase {
                 }
                 _ => self.metric_prefix.clone(),
             },
-            ssl_verify: match self.ssl_verify {
+            ssl_rootcert: match self.ssl_rootcert {
                 None => {
-                    self.ssl_verify = defaults.ssl_verify;
-                    defaults.ssl_verify
+                    self.ssl_rootcert = defaults.ssl_rootcert.clone();
+                    defaults.ssl_rootcert.clone()
                 }
-                _ => self.ssl_verify,
+                _ => self.ssl_rootcert.clone(),
+            },
+            sslmode: match self.sslmode {
+                None => {
+                    self.sslmode = Some(defaults.sslmode.clone());
+                    defaults.sslmode.clone()
+                }
+                _ => self.sslmode.clone().unwrap(),
             },
         };
 
