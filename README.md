@@ -200,7 +200,7 @@ sources:
     password: ""  # password to login to the DB, mandatory,
                   # environment variable can be used here
     sslmode: prefer   # SSL mode to connect to the DB, optional,
-                      # possible values are: disable, allow, prefer, require
+                      # possible values are: disable, prefer, require
     scrape_interval: 30m  # scrape interval for all DBs/queries of the source, optional,
                           # overrides value from the default section,
                           # can be overridden in DB/query section

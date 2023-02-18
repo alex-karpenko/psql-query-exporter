@@ -21,9 +21,12 @@ pub struct PostgresConnection {
 #[serde(rename_all = "lowercase")]
 pub enum PostgresSslMode {
     Disable,
-    Allow,
     Prefer,
     Require,
+    #[serde(rename="verify-ca")]
+    VerifyCa,
+    #[serde(rename="verify-full")]
+    VerifyFull
 }
 
 impl Default for PostgresSslMode {
@@ -36,9 +39,10 @@ impl Display for PostgresSslMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
             Self::Disable => "disable",
-            Self::Allow => "allow",
-            Self::Require => "require",
             Self::Prefer => "prefer",
+            Self::Require => "require",
+            Self::VerifyCa => "require",
+            Self::VerifyFull => "require",
         };
         write!(f, "{s}")
     }
