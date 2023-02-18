@@ -2,8 +2,8 @@ use serde::Deserialize;
 use std::{fmt::Display, time::Duration};
 use tracing::{debug, error};
 
-use native_tls::TlsConnector;
-use postgres_native_tls::MakeTlsConnector;
+use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
+use postgres_openssl::MakeTlsConnector;
 use tokio::task::JoinHandle;
 use tokio_postgres::{Client, Error, Row};
 
@@ -12,21 +12,22 @@ pub struct PostgresConnection {
     db_connection_string: String,
     client: Client,
     connection_handler: JoinHandle<()>,
-    ssl_verify: bool,
+    sslmode: PostgresSslMode,
+    ssl_rootcert: Option<String>,
     default_backoff_interval: Duration,
     max_backoff_interval: Duration,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum PostgresSslMode {
     Disable,
     Prefer,
     Require,
-    #[serde(rename="verify-ca")]
+    #[serde(rename = "verify-ca")]
     VerifyCa,
-    #[serde(rename="verify-full")]
-    VerifyFull
+    #[serde(rename = "verify-full")]
+    VerifyFull,
 }
 
 impl Default for PostgresSslMode {
@@ -48,25 +49,75 @@ impl Display for PostgresSslMode {
     }
 }
 
+impl PostgresSslMode {
+    fn get_mode_str(&self) -> &str {
+        match self {
+            PostgresSslMode::Disable => "Disabled",
+            PostgresSslMode::Prefer => "Prefer",
+            PostgresSslMode::Require => "Require",
+            PostgresSslMode::VerifyCa => "Verify-CA",
+            PostgresSslMode::VerifyFull => "Verify-Full",
+        }
+    }
+}
+
 impl PostgresConnection {
     pub async fn new(
         db_connection_string: String,
-        ssl_verify: bool,
+        sslmode: PostgresSslMode,
+        ssl_rootcert: Option<String>,
         default_backoff_interval: Duration,
         max_backoff_interval: Duration,
     ) -> Result<Self, Error> {
         debug!("PostgresConnection::new: construct new postgres connection");
 
         let mut backoff_interval = default_backoff_interval;
+
         loop {
-            let connector = TlsConnector::builder()
-                .danger_accept_invalid_certs(!ssl_verify)
-                .build();
-            let connector = match connector {
-                Ok(connector) => connector,
-                Err(e) => panic!("error while creating TLS connector: {e}"),
+            debug!("sslmode={}", sslmode.get_mode_str());
+            let mut connector = SslConnector::builder(SslMethod::tls())
+                .unwrap_or_else(|e| panic!("unable to create SSL connector: {}", e));
+
+            match sslmode {
+                PostgresSslMode::Disable => connector.set_verify(SslVerifyMode::NONE),
+                PostgresSslMode::Prefer => connector.set_verify(SslVerifyMode::NONE),
+                PostgresSslMode::Require => connector.set_verify(SslVerifyMode::NONE),
+                PostgresSslMode::VerifyCa => {
+                    connector.set_verify_callback(
+                        SslVerifyMode::PEER,
+                        |verify_indicator, x509_result| {
+                            let allowed_errors: Vec<i32> = vec![
+                                openssl_sys::X509_V_ERR_IP_ADDRESS_MISMATCH,
+                                openssl_sys::X509_V_ERR_HOSTNAME_MISMATCH,
+                                openssl_sys::X509_V_ERR_EMAIL_MISMATCH,
+                            ];
+                            debug!(
+                                "verify_callback, indicator={}, x509_result={}",
+                                verify_indicator,
+                                x509_result.error()
+                            );
+
+                            if !verify_indicator
+                                && allowed_errors.contains(&x509_result.error().as_raw())
+                            {
+                                true
+                            } else {
+                                verify_indicator
+                            }
+                        },
+                    );
+                }
+                PostgresSslMode::VerifyFull => connector.set_verify(SslVerifyMode::PEER),
             };
-            let connector = MakeTlsConnector::new(connector);
+
+            if let Some(rootcert) = ssl_rootcert.as_ref() {
+                debug!("loading CA bundle from {}", rootcert);
+                connector
+                    .set_ca_file(rootcert)
+                    .unwrap_or_else(|e| panic!("unable to load PEM CA file {}: {}", rootcert, e));
+            }
+
+            let connector = MakeTlsConnector::new(connector.build());
             let connection = tokio_postgres::connect(&db_connection_string, connector).await;
 
             match connection {
@@ -82,7 +133,8 @@ impl PostgresConnection {
                         client,
                         db_connection_string,
                         connection_handler,
-                        ssl_verify,
+                        sslmode,
+                        ssl_rootcert,
                         default_backoff_interval,
                         max_backoff_interval,
                     });
@@ -104,7 +156,8 @@ impl PostgresConnection {
         debug!("PostgresConnection::reconnect: try to reconnect");
         let new_connection = PostgresConnection::new(
             self.db_connection_string.clone(),
-            self.ssl_verify,
+            self.sslmode.clone(),
+            self.ssl_rootcert.clone(),
             self.default_backoff_interval,
             self.max_backoff_interval,
         )

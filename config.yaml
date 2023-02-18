@@ -1,7 +1,6 @@
 defaults:
   scrape_interval: 30s
   query_timeout: 5s
-  ssl_verify: false
 
 sources:
   postgres:

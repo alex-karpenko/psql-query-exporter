@@ -4,3 +4,4 @@
 /config-local.yaml
 .vscode
 /tests/**
+*.pem

@@ -1,6 +1,6 @@
 [package]
 name = "psql-query-exporter"
-version = "0.1.7"
+version = "0.2.0"
 edition = "2021"
 authors = ["Oleksii Karpenko <alexkarpenko@yahoo.com>"]
 description = "PostgreSQL Query Prometheus exporter"
@@ -18,8 +18,9 @@ tokio = { version = "1", features = ["full"] }
 warp = "0.3"
 prometheus = "0.13"
 tokio-postgres = "0.7"
-postgres-native-tls = "0.5"
-native-tls = "0.2"
+postgres-openssl = "0.5.0"
+openssl = "0.10"
+openssl-sys = "0.9"
 serde = { version = "1.0", features = ["derive"] }
 humantime-serde = "1.1"
 figment = { version = "0.10", features = ["yaml", "env"] }
