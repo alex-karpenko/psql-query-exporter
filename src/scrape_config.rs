@@ -269,7 +269,9 @@ impl ScrapeConfigSource {
         self.host = self.apply_envs_to_string(&self.host);
         self.user = self.apply_envs_to_string(&self.user);
         self.password = self.apply_envs_to_string(&self.password);
-        self.ssl_rootcert = Some(self.apply_envs_to_string(&self.ssl_rootcert.clone().unwrap()));
+        if let Some(rootcert) = self.ssl_rootcert.clone() {
+            self.ssl_rootcert = Some(self.apply_envs_to_string(&rootcert));
+        }
     }
 
     fn apply_envs_to_string(&self, text: &str) -> String {
