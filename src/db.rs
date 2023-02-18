@@ -18,7 +18,7 @@ pub struct PostgresConnection {
     max_backoff_interval: Duration,
 }
 
-#[derive(Deserialize, Debug, Clone, PartialEq)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum PostgresSslMode {
     Disable,
