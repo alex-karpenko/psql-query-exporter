@@ -1,7 +1,8 @@
 /target/
 /values-dev.yaml
+/values-test.yaml
 /config-dev.yaml
 /config-local.yaml
 .vscode
 /tests/**
-*.pem
+/*.pem

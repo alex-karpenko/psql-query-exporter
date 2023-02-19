@@ -45,6 +45,13 @@ spec:
                 name: {{ . }}
             {{- end }}
           {{- end }}
+          {{- with .Values.podEnv }}
+          env:
+            {{- range $k, $v := . }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+            {{- end }}
+          {{- end }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -68,6 +75,21 @@ spec:
               mountPath: /app/config.yaml
               readOnly: true
               subPath: config.yaml
+            {{- range .Values.secretMounts }}
+            - name: {{ .name }}
+              mountPath: {{ .mountPath }}
+              readOnly: true
+            {{- end }}
+            {{- range .Values.configMapMounts }}
+            - name: {{ .name }}
+              mountPath: {{ .mountPath }}
+              readOnly: true
+            {{- end }}
+            {{- range .Values.createConfigMaps }}
+            - name: {{ .name | default (printf "%s-%s" (include "psql-query-exporter.fullname" $) .folder) }}
+              mountPath: {{ .mountPath }}
+              readOnly: true
+            {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -83,5 +105,21 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: {{ include "psql-query-exporter.fullname" . }}
+            name: {{ include "psql-query-exporter.fullname" . }}-config
             defaultMode: 0444
+        {{- range .Values.secretMounts }}
+        - name: {{ .name }}
+          secret:
+            secretName: {{ .name }}
+            defaultMode: 0400
+        {{- end }}
+        {{- range .Values.configMapMounts }}
+        - name: {{ .name }}
+          configMap:
+            name: {{ .name }}
+        {{- end }}
+        {{- range .Values.createConfigMaps }}
+        - name: {{ .name | default (printf "%s-%s" (include "psql-query-exporter.fullname" $) .folder) }}
+          configMap:
+            name: {{ .name | default (printf "%s-%s" (include "psql-query-exporter.fullname" $) .folder) }}
+        {{- end }}
