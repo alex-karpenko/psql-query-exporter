@@ -226,9 +226,9 @@ async fn collect_one_db_instance(database: ScrapeConfigDatabase) {
     let mut db_connection = PostgresConnection::new(
         database.connection_string,
         database.sslmode.unwrap(),
-        database.ssl_rootcert,
-        database.ssl_cert,
-        database.ssl_key,
+        database.sslrootcert,
+        database.sslcert,
+        database.sslkey,
         database.backoff_interval,
         database.max_backoff_interval,
     )

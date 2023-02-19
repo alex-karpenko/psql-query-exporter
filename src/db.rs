@@ -13,9 +13,9 @@ pub struct PostgresConnection {
     client: Client,
     connection_handler: JoinHandle<()>,
     sslmode: PostgresSslMode,
-    ssl_rootcert: Option<String>,
-    ssl_cert: Option<String>,
-    ssl_key: Option<String>,
+    sslrootcert: Option<String>,
+    sslcert: Option<String>,
+    sslkey: Option<String>,
     default_backoff_interval: Duration,
     max_backoff_interval: Duration,
 }
@@ -67,9 +67,9 @@ impl PostgresConnection {
     pub async fn new(
         db_connection_string: String,
         sslmode: PostgresSslMode,
-        ssl_rootcert: Option<String>,
-        ssl_cert: Option<String>,
-        ssl_key: Option<String>,
+        sslrootcert: Option<String>,
+        sslcert: Option<String>,
+        sslkey: Option<String>,
         default_backoff_interval: Duration,
         max_backoff_interval: Duration,
     ) -> Result<Self, Error> {
@@ -114,25 +114,25 @@ impl PostgresConnection {
                 PostgresSslMode::VerifyFull => connector.set_verify(SslVerifyMode::PEER),
             };
 
-            if let Some(rootcert) = ssl_rootcert.as_ref() {
+            if let Some(rootcert) = sslrootcert.as_ref() {
                 debug!("loading CA bundle from {}", rootcert);
                 connector
                     .set_ca_file(rootcert)
                     .unwrap_or_else(|e| panic!("unable to load PEM CA file {}: {}", rootcert, e));
             }
 
-            if ssl_cert.is_some() && ssl_key.is_none() {
+            if sslcert.is_some() && sslkey.is_none() {
                 panic!(
                     "private key for client certificate {} should be defined.",
-                    ssl_cert.unwrap()
+                    sslcert.unwrap()
                 );
-            } else if ssl_cert.is_none() && ssl_key.is_some() {
+            } else if sslcert.is_none() && sslkey.is_some() {
                 panic!(
                     "client certificate for private key {} should be defined.",
-                    ssl_key.unwrap()
+                    sslkey.unwrap()
                 );
             } else {
-                if let Some(cert) = ssl_cert.as_ref() {
+                if let Some(cert) = sslcert.as_ref() {
                     debug!("loading client certificate from {}", cert);
                     connector
                         .set_certificate_file(cert, SslFiletype::PEM)
@@ -141,7 +141,7 @@ impl PostgresConnection {
                         });
                 }
 
-                if let Some(key) = ssl_key.as_ref() {
+                if let Some(key) = sslkey.as_ref() {
                     debug!("loading client private key from {}", key);
                     connector
                         .set_private_key_file(key, SslFiletype::PEM)
@@ -168,9 +168,9 @@ impl PostgresConnection {
                         db_connection_string,
                         connection_handler,
                         sslmode,
-                        ssl_rootcert,
-                        ssl_cert,
-                        ssl_key,
+                        sslrootcert,
+                        sslcert,
+                        sslkey,
                         default_backoff_interval,
                         max_backoff_interval,
                     });
@@ -193,9 +193,9 @@ impl PostgresConnection {
         let new_connection = PostgresConnection::new(
             self.db_connection_string.clone(),
             self.sslmode.clone(),
-            self.ssl_rootcert.clone(),
-            self.ssl_cert.clone(),
-            self.ssl_key.clone(),
+            self.sslrootcert.clone(),
+            self.sslcert.clone(),
+            self.sslkey.clone(),
             self.default_backoff_interval,
             self.max_backoff_interval,
         )
