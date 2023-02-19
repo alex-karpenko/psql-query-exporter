@@ -112,7 +112,7 @@ config: {}
 #  defaults:
 #    scrape_interval: 30s
 #    query_timeout: 5s
-#    ssl_rootcert: /ca/aws-ca/eu-west-1-bundle.pem
+#    sslrootcert: /ca/aws-ca/eu-west-1-bundle.pem
 #
 #  sources:
 #    postgres:

@@ -40,7 +40,9 @@ struct ScrapeConfigDefaults {
     #[serde(with = "humantime_serde")]
     metric_expiration_time: Duration,
     metric_prefix: Option<String>,
-    ssl_rootcert: Option<String>,
+    sslrootcert: Option<String>,
+    sslcert: Option<String>,
+    sslkey: Option<String>,
     sslmode: PostgresSslMode,
 }
 
@@ -65,7 +67,9 @@ pub struct ScrapeConfigSource {
     #[serde(with = "humantime_serde", default)]
     metric_expiration_time: Duration,
     metric_prefix: Option<String>,
-    ssl_rootcert: Option<String>,
+    sslrootcert: Option<String>,
+    sslcert: Option<String>,
+    sslkey: Option<String>,
     pub databases: Vec<ScrapeConfigDatabase>,
 }
 
@@ -89,7 +93,9 @@ pub struct ScrapeConfigDatabase {
     metric_expiration_time: Duration,
     metric_prefix: Option<String>,
     #[serde(skip)]
-    pub ssl_rootcert: Option<String>,
+    pub sslrootcert: Option<String>,
+    pub sslcert: Option<String>,
+    pub sslkey: Option<String>,
     pub queries: Vec<ScrapeConfigQuery>,
 }
 
@@ -194,7 +200,9 @@ impl Default for ScrapeConfigDefaults {
             max_backoff_interval: DB_CONNECTION_MAXIMUM_BACKOFF_INTERVAL,
             metric_expiration_time: DEFAULT_METRIC_EXPIRATION_TIME,
             metric_prefix: None,
-            ssl_rootcert: None,
+            sslrootcert: None,
+            sslcert: None,
+            sslkey: None,
             sslmode: PostgresSslMode::default(),
         }
     }
@@ -202,8 +210,14 @@ impl Default for ScrapeConfigDefaults {
 
 impl ScrapeConfigDefaults {
     fn merge_env_vars(&mut self) {
-        if let Some(rootcert) = self.ssl_rootcert.clone() {
-            self.ssl_rootcert = Some(apply_envs_to_string(&rootcert));
+        if let Some(rootcert) = self.sslrootcert.clone() {
+            self.sslrootcert = Some(apply_envs_to_string(&rootcert));
+        }
+        if let Some(cert) = self.sslcert.clone() {
+            self.sslcert = Some(apply_envs_to_string(&cert));
+        }
+        if let Some(key) = self.sslkey.clone() {
+            self.sslkey = Some(apply_envs_to_string(&key));
         }
     }
 }
@@ -252,12 +266,26 @@ impl ScrapeConfigSource {
                 }
                 _ => self.metric_prefix.clone(),
             },
-            ssl_rootcert: match self.ssl_rootcert {
+            sslrootcert: match self.sslrootcert {
                 None => {
-                    self.ssl_rootcert = defaults.ssl_rootcert.clone();
-                    defaults.ssl_rootcert.clone()
+                    self.sslrootcert = defaults.sslrootcert.clone();
+                    defaults.sslrootcert.clone()
                 }
-                _ => self.ssl_rootcert.clone(),
+                _ => self.sslrootcert.clone(),
+            },
+            sslcert: match self.sslcert {
+                None => {
+                    self.sslcert = defaults.sslcert.clone();
+                    defaults.sslcert.clone()
+                }
+                _ => self.sslcert.clone(),
+            },
+            sslkey: match self.sslkey {
+                None => {
+                    self.sslkey = defaults.sslkey.clone();
+                    defaults.sslkey.clone()
+                }
+                _ => self.sslkey.clone(),
             },
             sslmode: match self.sslmode {
                 None => {
@@ -278,8 +306,14 @@ impl ScrapeConfigSource {
         self.host = apply_envs_to_string(&self.host);
         self.user = apply_envs_to_string(&self.user);
         self.password = apply_envs_to_string(&self.password);
-        if let Some(rootcert) = self.ssl_rootcert.clone() {
-            self.ssl_rootcert = Some(apply_envs_to_string(&rootcert));
+        if let Some(rootcert) = self.sslrootcert.clone() {
+            self.sslrootcert = Some(apply_envs_to_string(&rootcert));
+        }
+        if let Some(cert) = self.sslcert.clone() {
+            self.sslcert = Some(apply_envs_to_string(&cert));
+        }
+        if let Some(key) = self.sslkey.clone() {
+            self.sslkey = Some(apply_envs_to_string(&key));
         }
     }
 }
@@ -325,12 +359,26 @@ impl ScrapeConfigDatabase {
                 }
                 _ => self.metric_prefix.clone(),
             },
-            ssl_rootcert: match self.ssl_rootcert {
+            sslrootcert: match self.sslrootcert {
                 None => {
-                    self.ssl_rootcert = defaults.ssl_rootcert.clone();
-                    defaults.ssl_rootcert.clone()
+                    self.sslrootcert = defaults.sslrootcert.clone();
+                    defaults.sslrootcert.clone()
                 }
-                _ => self.ssl_rootcert.clone(),
+                _ => self.sslrootcert.clone(),
+            },
+            sslcert: match self.sslcert {
+                None => {
+                    self.sslcert = defaults.sslcert.clone();
+                    defaults.sslcert.clone()
+                }
+                _ => self.sslcert.clone(),
+            },
+            sslkey: match self.sslkey {
+                None => {
+                    self.sslkey = defaults.sslkey.clone();
+                    defaults.sslkey.clone()
+                }
+                _ => self.sslkey.clone(),
             },
             sslmode: match self.sslmode {
                 None => {

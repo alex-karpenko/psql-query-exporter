@@ -137,11 +137,15 @@ defaults:
 
   sslmode: prefer       # SSL mode to connect to the DB, optional,
                         # possible values are: disable, prefer, require, verify-ca and verify-full
-                        # may be overridden by source/db config
+                        # may be overridden by source/ config
 
-  ssl_rootcert: ""      # path to additional root (CA) certificates file
+  sslrootcert: ""       # path to additional root (CA) certificates file
                         # should be in PEM format and may contain more than one certificate
-                        # may be overridden by source/db config
+                        # may be overridden by source config
+
+  sslcert: ""           # path to client certificates and key files
+  sslkey: ""            # should be in PEM format
+                        # may be overridden by source config
 
   metric_expiration_time: 0s # if all query attempts during this time were failed,
                              # then metric should be excluded from the output 
@@ -168,7 +172,7 @@ So `sources` section is a dictionary, each key is mnemonic name of the source. E
 
 #### Sources definition
 
-In the `host`, `user`, `password` and `ssl_rootcert` values environment variables can be used to set whole value of the field or part of it, by replacing `${NAME}` with value of the `NAME` environment variable. For example:
+In the `host`, `user`, `password`, `sslrootcert`, `sslcert` and `sslkey` values environment variables can be used to set whole value of the field or part of it, by replacing `${NAME}` with value of the `NAME` environment variable. For example:
 
 ```yaml
   host: db.${ENV_NAME}.example.com
@@ -205,8 +209,11 @@ sources:
                   # environment variable can be used here
     sslmode: prefer   # SSL mode to connect to the DB, optional,
                       # possible values are: disable, prefer, require, verify-ca and verify-full
-    ssl_rootcert: ""  # path to additional root (CA) certificates file
+    sslrootcert: ""   # path to additional root (CA) certificates file
                       # should be in PEM format and may contain more than one certificate
+    sslcert: ""       # path to client certificates and key files
+    sslkey: ""        # should be in PEM format
+                      # may be overridden by source config
     scrape_interval: 30m  # scrape interval for all DBs/queries of the source, optional,
                           # overrides value from the default section,
                           # can be overridden in DB/query section
