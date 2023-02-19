@@ -171,6 +171,7 @@ impl ScrapeConfig {
             ),
         };
 
+        config.defaults.merge_env_vars();
         config.sources.iter_mut().for_each(|(_name, instance)| {
             instance.merge_env_vars();
             instance.propagate_defaults(&config.defaults);
@@ -195,6 +196,14 @@ impl Default for ScrapeConfigDefaults {
             metric_prefix: None,
             ssl_rootcert: None,
             sslmode: PostgresSslMode::default(),
+        }
+    }
+}
+
+impl ScrapeConfigDefaults {
+    fn merge_env_vars(&mut self) {
+        if let Some(rootcert) = self.ssl_rootcert.clone() {
+            self.ssl_rootcert = Some(apply_envs_to_string(&rootcert));
         }
     }
 }
@@ -266,27 +275,12 @@ impl ScrapeConfigSource {
     }
 
     fn merge_env_vars(&mut self) {
-        self.host = self.apply_envs_to_string(&self.host);
-        self.user = self.apply_envs_to_string(&self.user);
-        self.password = self.apply_envs_to_string(&self.password);
+        self.host = apply_envs_to_string(&self.host);
+        self.user = apply_envs_to_string(&self.user);
+        self.password = apply_envs_to_string(&self.password);
         if let Some(rootcert) = self.ssl_rootcert.clone() {
-            self.ssl_rootcert = Some(self.apply_envs_to_string(&rootcert));
+            self.ssl_rootcert = Some(apply_envs_to_string(&rootcert));
         }
-    }
-
-    fn apply_envs_to_string(&self, text: &str) -> String {
-        let re = Regex::new(r"\$\{[a-zA-Z][A-Za-z0-9_]*\}")
-            .unwrap_or_else(|e| panic!("looks like a BUG: {e}"));
-        let mut result = text.to_owned();
-        for item in re.captures_iter(text) {
-            let env_name = item.get(0).expect("looks like a BUG").as_str().to_string();
-            let env_name = env_name.trim_start_matches("${").trim_end_matches('}');
-            let env_value = env::var(env_name)
-                .unwrap_or_else(|_| panic!("environment variable '{env_name}' expected"));
-            result = re.replace_all(&result, env_value).to_string();
-        }
-
-        result
     }
 }
 
@@ -398,4 +392,19 @@ impl Default for FieldType {
     fn default() -> Self {
         Self::Int
     }
+}
+
+fn apply_envs_to_string(text: &str) -> String {
+    let re = Regex::new(r"\$\{[a-zA-Z][A-Za-z0-9_]*\}")
+        .unwrap_or_else(|e| panic!("looks like a BUG: {e}"));
+    let mut result = text.to_owned();
+    for item in re.captures_iter(text) {
+        let env_name = item.get(0).expect("looks like a BUG").as_str().to_string();
+        let env_name = env_name.trim_start_matches("${").trim_end_matches('}');
+        let env_value = env::var(env_name)
+            .unwrap_or_else(|_| panic!("environment variable '{env_name}' is expected"));
+        result = re.replace_all(&result, env_value).to_string();
+    }
+
+    result
 }
