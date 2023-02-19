@@ -74,8 +74,36 @@ tolerations: []
 
 affinity: {}
 
+# Define pod's environment variables
+podEnv: {}
+#  DB1_HOSTNAME: localhost
+#  DB2_HOSTNAME: db.example.com
+
+# Load content of Secrets as environment variables
 secrets: []
 #  - psql-query-exporter
+
+# Mount Secrets as files
+secretMounts: []
+#  - name: psql-query-exporter-tls
+#    mountPath: /secrets/tls
+
+# Mount ConfigMaps as files
+configMapMounts: []
+#  - name: psql-query-exporter-ca
+#    mountPath: /secrets/ca
+
+# Create ConfigMaps from files in the specified folders and mount them
+# One folder - one ConfigMap - one mount path
+# This is convenient way to load files like CA certificates
+# Folders should be in the chart directory (see aws-ca example) at the same level as templates folder
+# WARNINGS:
+#  * don't use this approach to store secrets like certificate keys
+#  * size of ConfigMap resource is restricted to 1Mb by K8s
+createConfigMaps: []
+#  - folder: aws-ca
+#    mountPath: /ca/aws-ca
+#    name: psql-query-exporter-aws-ca # optional, default is <deployment-full-name>-<folder-name>
 
 # info or debug, anything else - warning
 logLevel: warning
@@ -84,6 +112,7 @@ config: {}
 #  defaults:
 #    scrape_interval: 30s
 #    query_timeout: 5s
+#    ssl_rootcert: /ca/aws-ca/eu-west-1-bundle.pem
 #
 #  sources:
 #    postgres:
