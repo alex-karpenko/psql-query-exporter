@@ -2,7 +2,7 @@ use serde::Deserialize;
 use std::{fmt::Display, time::Duration};
 use tracing::{debug, error};
 
-use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
+use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
 use postgres_openssl::MakeTlsConnector;
 use tokio::task::JoinHandle;
 use tokio_postgres::{Client, Error, Row};
@@ -14,6 +14,8 @@ pub struct PostgresConnection {
     connection_handler: JoinHandle<()>,
     sslmode: PostgresSslMode,
     ssl_rootcert: Option<String>,
+    ssl_cert: Option<String>,
+    ssl_key: Option<String>,
     default_backoff_interval: Duration,
     max_backoff_interval: Duration,
 }
@@ -66,6 +68,8 @@ impl PostgresConnection {
         db_connection_string: String,
         sslmode: PostgresSslMode,
         ssl_rootcert: Option<String>,
+        ssl_cert: Option<String>,
+        ssl_key: Option<String>,
         default_backoff_interval: Duration,
         max_backoff_interval: Duration,
     ) -> Result<Self, Error> {
@@ -117,6 +121,36 @@ impl PostgresConnection {
                     .unwrap_or_else(|e| panic!("unable to load PEM CA file {}: {}", rootcert, e));
             }
 
+            if ssl_cert.is_some() && ssl_key.is_none() {
+                panic!(
+                    "private key for client certificate {} should be defined.",
+                    ssl_cert.unwrap()
+                );
+            } else if ssl_cert.is_none() && ssl_key.is_some() {
+                panic!(
+                    "client certificate for private key {} should be defined.",
+                    ssl_key.unwrap()
+                );
+            } else {
+                if let Some(cert) = ssl_cert.as_ref() {
+                    debug!("loading client certificate from {}", cert);
+                    connector
+                        .set_certificate_file(cert, SslFiletype::PEM)
+                        .unwrap_or_else(|e| {
+                            panic!("unable to load PEM client certificate file {}: {}", cert, e)
+                        });
+                }
+
+                if let Some(key) = ssl_key.as_ref() {
+                    debug!("loading client private key from {}", key);
+                    connector
+                        .set_private_key_file(key, SslFiletype::PEM)
+                        .unwrap_or_else(|e| {
+                            panic!("unable to load PEM client private key file {}: {}", key, e)
+                        });
+                }
+            }
+
             let connector = MakeTlsConnector::new(connector.build());
             let connection = tokio_postgres::connect(&db_connection_string, connector).await;
 
@@ -135,6 +169,8 @@ impl PostgresConnection {
                         connection_handler,
                         sslmode,
                         ssl_rootcert,
+                        ssl_cert,
+                        ssl_key,
                         default_backoff_interval,
                         max_backoff_interval,
                     });
@@ -158,6 +194,8 @@ impl PostgresConnection {
             self.db_connection_string.clone(),
             self.sslmode.clone(),
             self.ssl_rootcert.clone(),
+            self.ssl_cert.clone(),
+            self.ssl_key.clone(),
             self.default_backoff_interval,
             self.max_backoff_interval,
         )

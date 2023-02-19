@@ -137,11 +137,15 @@ defaults:
 
   sslmode: prefer       # SSL mode to connect to the DB, optional,
                         # possible values are: disable, prefer, require, verify-ca and verify-full
-                        # may be overridden by source/db config
+                        # may be overridden by source/ config
 
   ssl_rootcert: ""      # path to additional root (CA) certificates file
                         # should be in PEM format and may contain more than one certificate
-                        # may be overridden by source/db config
+                        # may be overridden by source config
+
+  ssl_cert: ""          # path to client certificates and key files
+  ssl_key: ""           # should be in PEM format
+                        # may be overridden by source config
 
   metric_expiration_time: 0s # if all query attempts during this time were failed,
                              # then metric should be excluded from the output 
@@ -207,6 +211,9 @@ sources:
                       # possible values are: disable, prefer, require, verify-ca and verify-full
     ssl_rootcert: ""  # path to additional root (CA) certificates file
                       # should be in PEM format and may contain more than one certificate
+    ssl_cert: ""      # path to client certificates and key files
+    ssl_key: ""       # should be in PEM format
+                        # may be overridden by source config
     scrape_interval: 30m  # scrape interval for all DBs/queries of the source, optional,
                           # overrides value from the default section,
                           # can be overridden in DB/query section

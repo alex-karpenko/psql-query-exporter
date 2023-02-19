@@ -227,6 +227,8 @@ async fn collect_one_db_instance(database: ScrapeConfigDatabase) {
         database.connection_string,
         database.sslmode.unwrap(),
         database.ssl_rootcert,
+        database.ssl_cert,
+        database.ssl_key,
         database.backoff_interval,
         database.max_backoff_interval,
     )
