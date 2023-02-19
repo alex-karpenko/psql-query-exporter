@@ -402,7 +402,7 @@ fn apply_envs_to_string(text: &str) -> String {
         let env_name = item.get(0).expect("looks like a BUG").as_str().to_string();
         let env_name = env_name.trim_start_matches("${").trim_end_matches('}');
         let env_value = env::var(env_name)
-            .unwrap_or_else(|_| panic!("environment variable '{env_name}' expected"));
+            .unwrap_or_else(|_| panic!("environment variable '{env_name}' is expected"));
         result = re.replace_all(&result, env_value).to_string();
     }
 
