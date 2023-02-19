@@ -213,7 +213,7 @@ sources:
                       # should be in PEM format and may contain more than one certificate
     ssl_cert: ""      # path to client certificates and key files
     ssl_key: ""       # should be in PEM format
-                        # may be overridden by source config
+                      # may be overridden by source config
     scrape_interval: 30m  # scrape interval for all DBs/queries of the source, optional,
                           # overrides value from the default section,
                           # can be overridden in DB/query section
