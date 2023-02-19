@@ -172,7 +172,7 @@ So `sources` section is a dictionary, each key is mnemonic name of the source. E
 
 #### Sources definition
 
-In the `host`, `user`, `password` and `ssl_rootcert` values environment variables can be used to set whole value of the field or part of it, by replacing `${NAME}` with value of the `NAME` environment variable. For example:
+In the `host`, `user`, `password`, `ssl_rootcert`, `ssl_cert` and `ssl_key` values environment variables can be used to set whole value of the field or part of it, by replacing `${NAME}` with value of the `NAME` environment variable. For example:
 
 ```yaml
   host: db.${ENV_NAME}.example.com
