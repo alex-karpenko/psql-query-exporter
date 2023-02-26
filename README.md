@@ -50,10 +50,17 @@ docker run --rm --name psql-query-exporter -v $PWD/config.yaml:/config.yaml -e P
 
 ### Helm chart
 
-Just create your own values file with overrides of the default values and your own config section and deploy Helm release to your K8s cluster:
+To add Helm repository:
 
 ```bash
-helm install psql-query-exporter ./helm/psql-query-exporter -f my-values.yaml
+helm repo add alex-karpenko https://alex-karpenko.github.io/helm-charts
+helm repo update
+```
+
+To deploy release create your own values file with overrides of the default values and your own config section and deploy Helm release to your K8s cluster:
+
+```bash
+helm install psql-query-exporter alex-karpenko/psql-query-exporter -f my-values.yaml
 ```
 
 For example your values can be like below. Don't forget to create secret `psql-query-exporter` with two keys `PG_USER` and `PG_PASSWORD` with username and password to access DB.
@@ -97,7 +104,6 @@ config:
                 - slot_name
                 - slot_type
                 - active
-
 ```
 
 ### Build your own binary
