@@ -1,7 +1,9 @@
-use crate::db::PostgresConnection;
+use crate::db::{PostgresConnection, PostgresSslCertificates};
+use crate::errors::PsqlExporterError;
 use crate::scrape_config::{
     FieldType, ScrapeConfig, ScrapeConfigDatabase, ScrapeConfigQuery, ScrapeConfigValues,
 };
+use crate::utils::{ShutdownReceiver, SleepHelper};
 
 use prometheus::core::{AtomicF64, AtomicI64, Collector, GenericGauge, GenericGaugeVec};
 use prometheus::{
@@ -13,7 +15,7 @@ use tokio_postgres::Row;
 use std::convert::Infallible;
 use std::time::{Duration, SystemTime};
 
-use tracing::{debug, error, warn};
+use tracing::{debug, error, info};
 
 #[derive(Debug)]
 pub enum MetricWithType {
@@ -42,7 +44,7 @@ struct QueryMetrics {
 }
 
 impl QueryMetrics {
-    fn from(query_config: &ScrapeConfigQuery) -> Self {
+    fn from(query_config: &ScrapeConfigQuery) -> Result<Self, PsqlExporterError> {
         let mut metrics: Vec<MetricWithType> = vec![];
 
         match &query_config.values {
@@ -58,12 +60,10 @@ impl QueryMetrics {
 
                 let new_metric =
                     Self::helper_create_metric(&query_config.var_labels, &values.field_type, opts)
-                        .unwrap_or_else(|e| {
-                            panic!(
-                                "error while creating metric {}: {}",
-                                query_config.metric_name, e
-                            )
-                        });
+                        .map_err(|e| PsqlExporterError::CreateMetric {
+                            metric: query_config.metric_name.clone(),
+                            cause: e,
+                        })?;
 
                 metrics.push(new_metric);
             }
@@ -87,12 +87,10 @@ impl QueryMetrics {
                         &value.field_type,
                         opts,
                     )
-                    .unwrap_or_else(|e| {
-                        panic!(
-                            "error while creating metric {}: {}",
-                            query_config.metric_name, e
-                        )
-                    });
+                    .map_err(|e| PsqlExporterError::CreateMetric {
+                        metric: query_config.metric_name.clone(),
+                        cause: e,
+                    })?;
 
                     metrics.push(new_metric);
                 }
@@ -116,24 +114,22 @@ impl QueryMetrics {
                         &value.field_type,
                         opts,
                     )
-                    .unwrap_or_else(|e| {
-                        panic!(
-                            "error while creating metric {}: {}",
-                            query_config.metric_name, e
-                        )
-                    });
+                    .map_err(|e| PsqlExporterError::CreateMetric {
+                        metric: query_config.metric_name.clone(),
+                        cause: e,
+                    })?;
 
                     metrics.push(new_metric);
                 }
             }
         };
 
-        QueryMetrics {
+        Ok(QueryMetrics {
             metrics,
             is_registered: false,
             last_updated: SystemTime::now() - query_config.metric_expiration_time,
             next_query_time: SystemTime::now(),
-        }
+        })
     }
 
     fn helper_create_metric(
@@ -201,46 +197,86 @@ pub async fn compose_reply() -> Result<impl warp::Reply, Infallible> {
     Ok(String::from_utf8(buffer).unwrap_or_else(|e| panic!("looks like a BUG: {e}")))
 }
 
-pub async fn collecting_task(scrape_config: ScrapeConfig) {
+pub async fn collecting_task(
+    scrape_config: ScrapeConfig,
+    shutdown_channel: ShutdownReceiver,
+) -> Result<(), PsqlExporterError> {
     debug!("collecting_task: config={scrape_config:?}");
+    let mut handler_index: usize = 0;
     let (tx, mut rx) = mpsc::channel(scrape_config.len());
     let sources = scrape_config.sources;
     for (_, source_db_instance) in sources {
         let databases = source_db_instance.databases;
         for database in databases {
             let tx = tx.clone();
-            tokio::task::spawn(async move {
-                collect_one_db_instance(database).await;
-                tx.send(true).await.unwrap_or(());
+            let shut_rx = shutdown_channel.clone();
+            tokio::spawn(async move {
+                let handler_result = collect_one_db_instance(database, shut_rx).await;
+                let send_result = tx
+                    .send(handler_index)
+                    .await
+                    .map_err(PsqlExporterError::MetricsBackStatusSend);
+
+                if let Err(result) = handler_result {
+                    match result {
+                        PsqlExporterError::ShutdownSignalReceived => {
+                            debug!("collect db task #{handler_index} completed by shutdown signal");
+                            Ok(())
+                        }
+                        _ => {
+                            error!("collect db task completed unexpectedly: {result}");
+                            Err(result)
+                        }
+                    }
+                } else if let Err(result) = send_result {
+                    Err(result)
+                } else {
+                    handler_result
+                }
             });
+            handler_index += 1;
         }
     }
 
-    while let Some(_msg) = rx.recv().await {
-        warn!("collecting_task: one of the collect_one_db_instance threads has been completed");
+    debug!("collecting_task: {handler_index} handlers have been started");
+
+    while let Some(task_index) = rx.recv().await {
+        debug!("collecting_task: collecting_task_handler #{task_index} has been completed");
+        handler_index -= 1;
+        if handler_index == 0 {
+            info!("collecting_task: all tasks have been stopped, exiting");
+            return Ok(());
+        }
     }
+
+    Ok(())
 }
 
-async fn collect_one_db_instance(database: ScrapeConfigDatabase) {
+async fn collect_one_db_instance(
+    database: ScrapeConfigDatabase,
+    shutdown_channel: ShutdownReceiver,
+) -> Result<(), PsqlExporterError> {
     debug!("collect_one_db_instance: start task for {database:?}");
+    let certificates =
+        PostgresSslCertificates::from(database.sslrootcert, database.sslcert, database.sslkey)?;
     let mut db_connection = PostgresConnection::new(
         database.connection_string,
         database.sslmode.unwrap(),
-        database.sslrootcert,
-        database.sslcert,
-        database.sslkey,
+        certificates,
         database.backoff_interval,
         database.max_backoff_interval,
+        shutdown_channel.clone(),
     )
-    .await
-    .unwrap_or_else(|e| panic!("can't create db connection: {e}"));
+    .await?;
 
     let registry = prometheus::default_registry();
     let mut query_metrics: Vec<QueryMetrics> = Vec::with_capacity(database.queries.len());
-    database
-        .queries
-        .iter()
-        .for_each(|q| query_metrics.push(QueryMetrics::from(q)));
+    let mut sleeper = SleepHelper::from(shutdown_channel.clone());
+
+    for q in database.queries.iter() {
+        let metric = QueryMetrics::from(q)?;
+        query_metrics.push(metric);
+    }
 
     loop {
         for (query_item, index) in database.queries.iter().zip(0..query_metrics.len()) {
@@ -309,7 +345,7 @@ async fn collect_one_db_instance(database: ScrapeConfigDatabase) {
                     error!("{e}")
                 }
             };
-            query_metrics[index].next_query_time = SystemTime::now() + query_item.scrape_interval
+            query_metrics[index].next_query_time = SystemTime::now() + query_item.scrape_interval;
         }
 
         let next_query_time = query_metrics
@@ -317,13 +353,13 @@ async fn collect_one_db_instance(database: ScrapeConfigDatabase) {
             .min_by(|x, y| x.next_query_time.cmp(&y.next_query_time))
             .map(|x| x.next_query_time)
             .expect("looks like a BUG");
+
         if next_query_time > SystemTime::now() {
-            tokio::time::sleep(
-                next_query_time
-                    .duration_since(SystemTime::now())
-                    .unwrap_or_else(|e| panic!("looks like a BUG: {e}")),
-            )
-            .await;
+            let sleep_time = next_query_time
+                .duration_since(SystemTime::now())
+                .unwrap_or(Duration::from_micros(0));
+
+            sleeper.sleep(sleep_time).await?;
         }
     }
 }

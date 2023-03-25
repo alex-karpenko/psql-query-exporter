@@ -1,3 +1,8 @@
+use crate::{
+    errors::PsqlExporterError,
+    utils::{ShutdownReceiver, SleepHelper},
+};
+
 use serde::Deserialize;
 use std::{fmt::Display, time::Duration};
 use tracing::{debug, error};
@@ -5,19 +10,55 @@ use tracing::{debug, error};
 use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
 use postgres_openssl::MakeTlsConnector;
 use tokio::task::JoinHandle;
-use tokio_postgres::{Client, Error, Row};
+use tokio_postgres::{Client, Row};
 
+const DB_APP_NAME: &str = env!("CARGO_PKG_NAME");
+const DB_APP_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+#[derive(Clone, Debug)]
+pub struct PostgresConnectionString {
+    pub host: String,
+    pub port: u16,
+    pub dbname: String,
+    pub user: String,
+    pub password: String,
+    pub sslmode: PostgresSslMode,
+}
+
+impl Display for PostgresConnectionString {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "host={host} port={port} dbname={dbname} user={user} password='***' sslmode={sslmode} application_name={DB_APP_NAME}-v{DB_APP_VERSION}", host=self.host, port=self.port, user=self.user, sslmode=self.sslmode, dbname=self.dbname)
+    }
+}
+
+impl Default for PostgresConnectionString {
+    fn default() -> Self {
+        PostgresConnectionString {
+            host: String::new(),
+            port: 5432,
+            dbname: String::new(),
+            user: String::new(),
+            password: String::new(),
+            sslmode: PostgresSslMode::Prefer,
+        }
+    }
+}
+
+impl PostgresConnectionString {
+    fn get_conn_string(&self) -> String {
+        format!("host={host} port={port} dbname={dbname} user={user} password='{password}' sslmode={sslmode} application_name={DB_APP_NAME}-v{DB_APP_VERSION}", host=self.host, port=self.port, user=self.user, password=self.password, sslmode=self.sslmode, dbname=self.dbname)
+    }
+}
 #[derive(Debug)]
 pub struct PostgresConnection {
-    db_connection_string: String,
+    db_connection_string: PostgresConnectionString,
     client: Client,
     connection_handler: JoinHandle<()>,
     sslmode: PostgresSslMode,
-    sslrootcert: Option<String>,
-    sslcert: Option<String>,
-    sslkey: Option<String>,
+    certificates: PostgresSslCertificates,
     default_backoff_interval: Duration,
     max_backoff_interval: Duration,
+    shutdown_channel: ShutdownReceiver,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -51,36 +92,60 @@ impl Display for PostgresSslMode {
     }
 }
 
-impl PostgresSslMode {
-    fn get_mode_str(&self) -> &str {
-        match self {
-            PostgresSslMode::Disable => "Disabled",
-            PostgresSslMode::Prefer => "Prefer",
-            PostgresSslMode::Require => "Require",
-            PostgresSslMode::VerifyCa => "Verify-CA",
-            PostgresSslMode::VerifyFull => "Verify-Full",
+#[derive(Debug, Clone)]
+pub struct PostgresSslCertificates {
+    rootcert: Option<String>,
+    cert: Option<String>,
+    key: Option<String>,
+}
+
+impl PostgresSslCertificates {
+    pub fn from(
+        rootcert: Option<String>,
+        cert: Option<String>,
+        key: Option<String>,
+    ) -> Result<Self, PsqlExporterError> {
+        if cert.is_some() && key.is_none() {
+            Err(PsqlExporterError::PostgresTlsClientConfig(format!(
+                "private key for client certificate {} should be defined.",
+                cert.unwrap()
+            )))
+        } else if cert.is_none() && key.is_some() {
+            Err(PsqlExporterError::PostgresTlsClientConfig(format!(
+                "client certificate for private key {} should be defined.",
+                key.unwrap()
+            )))
+        } else {
+            Ok(Self {
+                rootcert,
+                cert,
+                key,
+            })
         }
+    }
+
+    pub fn has_client_cert(&self) -> bool {
+        self.cert.is_some()
     }
 }
 
 impl PostgresConnection {
     pub async fn new(
-        db_connection_string: String,
+        db_connection_string: PostgresConnectionString,
         sslmode: PostgresSslMode,
-        sslrootcert: Option<String>,
-        sslcert: Option<String>,
-        sslkey: Option<String>,
+        certificates: PostgresSslCertificates,
         default_backoff_interval: Duration,
         max_backoff_interval: Duration,
-    ) -> Result<Self, Error> {
+        shutdown_channel: ShutdownReceiver,
+    ) -> Result<Self, PsqlExporterError> {
         debug!("PostgresConnection::new: construct new postgres connection");
 
         let mut backoff_interval = default_backoff_interval;
+        let mut sleeper = SleepHelper::from(shutdown_channel.clone());
 
         loop {
-            debug!("sslmode={}", sslmode.get_mode_str());
             let mut connector = SslConnector::builder(SslMethod::tls())
-                .unwrap_or_else(|e| panic!("unable to create SSL connector: {}", e));
+                .map_err(PsqlExporterError::PostgresTlsConnector)?;
 
             match sslmode {
                 PostgresSslMode::Disable => connector.set_verify(SslVerifyMode::NONE),
@@ -114,45 +179,41 @@ impl PostgresConnection {
                 PostgresSslMode::VerifyFull => connector.set_verify(SslVerifyMode::PEER),
             };
 
-            if let Some(rootcert) = sslrootcert.as_ref() {
+            if let Some(rootcert) = certificates.rootcert.as_ref() {
                 debug!("loading CA bundle from {}", rootcert);
-                connector
-                    .set_ca_file(rootcert)
-                    .unwrap_or_else(|e| panic!("unable to load PEM CA file {}: {}", rootcert, e));
+                connector.set_ca_file(rootcert).map_err(|e| {
+                    PsqlExporterError::PostgresTlsRootCertificate {
+                        rootcert: (*rootcert).clone(),
+                        cause: e,
+                    }
+                })?;
             }
 
-            if sslcert.is_some() && sslkey.is_none() {
-                panic!(
-                    "private key for client certificate {} should be defined.",
-                    sslcert.unwrap()
-                );
-            } else if sslcert.is_none() && sslkey.is_some() {
-                panic!(
-                    "client certificate for private key {} should be defined.",
-                    sslkey.unwrap()
-                );
-            } else {
-                if let Some(cert) = sslcert.as_ref() {
+            if certificates.has_client_cert() {
+                if let Some(cert) = certificates.cert.as_ref() {
                     debug!("loading client certificate from {}", cert);
                     connector
                         .set_certificate_file(cert, SslFiletype::PEM)
-                        .unwrap_or_else(|e| {
-                            panic!("unable to load PEM client certificate file {}: {}", cert, e)
-                        });
+                        .map_err(|e| PsqlExporterError::PostgresTlsClientCertificate {
+                            filename: (*cert).clone(),
+                            cause: e,
+                        })?;
                 }
 
-                if let Some(key) = sslkey.as_ref() {
+                if let Some(key) = certificates.key.as_ref() {
                     debug!("loading client private key from {}", key);
                     connector
                         .set_private_key_file(key, SslFiletype::PEM)
-                        .unwrap_or_else(|e| {
-                            panic!("unable to load PEM client private key file {}: {}", key, e)
-                        });
+                        .map_err(|e| PsqlExporterError::PostgresTlsClientCertificate {
+                            filename: (*key).clone(),
+                            cause: e,
+                        })?;
                 }
             }
 
             let connector = MakeTlsConnector::new(connector.build());
-            let connection = tokio_postgres::connect(&db_connection_string, connector).await;
+            let connection =
+                tokio_postgres::connect(&db_connection_string.get_conn_string(), connector).await;
 
             match connection {
                 Ok((client, connection)) => {
@@ -168,11 +229,10 @@ impl PostgresConnection {
                         db_connection_string,
                         connection_handler,
                         sslmode,
-                        sslrootcert,
-                        sslcert,
-                        sslkey,
+                        certificates,
                         default_backoff_interval,
                         max_backoff_interval,
+                        shutdown_channel,
                     });
                 }
                 Err(e) => {
@@ -180,7 +240,7 @@ impl PostgresConnection {
                 }
             };
 
-            tokio::time::sleep(backoff_interval).await;
+            sleeper.sleep(backoff_interval).await?;
             backoff_interval += default_backoff_interval;
             if backoff_interval > max_backoff_interval {
                 backoff_interval = max_backoff_interval;
@@ -188,16 +248,15 @@ impl PostgresConnection {
         }
     }
 
-    async fn reconnect(&mut self) -> Result<&Self, Error> {
+    async fn reconnect(&mut self) -> Result<&Self, PsqlExporterError> {
         debug!("PostgresConnection::reconnect: try to reconnect");
         let new_connection = PostgresConnection::new(
             self.db_connection_string.clone(),
             self.sslmode.clone(),
-            self.sslrootcert.clone(),
-            self.sslcert.clone(),
-            self.sslkey.clone(),
+            self.certificates.clone(),
             self.default_backoff_interval,
             self.max_backoff_interval,
+            self.shutdown_channel.clone(),
         )
         .await;
 
@@ -214,26 +273,30 @@ impl PostgresConnection {
         }
     }
 
-    pub async fn query(&mut self, query: &str, query_timeout: Duration) -> Result<Vec<Row>, Error> {
+    pub async fn query(
+        &mut self,
+        query: &str,
+        query_timeout: Duration,
+    ) -> Result<Vec<Row>, PsqlExporterError> {
         debug!("PostgresConnection::query: {query:?}");
+
         let mut backoff_interval = self.default_backoff_interval;
+        let mut sleeper = SleepHelper::from(self.shutdown_channel.clone());
 
         loop {
             // Set statement timeout
-            let result = self
-                .client
-                .query(
-                    format!("set statement_timeout={};", query_timeout.as_millis()).as_str(),
-                    &[],
-                )
-                .await;
+            let set_timeout_query = format!("set statement_timeout={};", query_timeout.as_millis());
+            let result = self.client.query(set_timeout_query.as_str(), &[]).await;
             if let Err(e) = result {
                 error!("PostgresConnection::query: {e}");
                 if e.code().is_none() {
                     debug!("PostgresConnection::query: try to reconnect after error");
                     self.reconnect().await?;
                 } else {
-                    return Err(e);
+                    return Err(PsqlExporterError::PostgresQuery {
+                        query: set_timeout_query,
+                        cause: e,
+                    });
                 }
             } else {
                 // Execute actual query
@@ -244,14 +307,17 @@ impl PostgresConnection {
                         debug!("PostgresConnection::query: try to reconnect after error");
                         self.reconnect().await?;
                     } else {
-                        return Err(e);
+                        return Err(PsqlExporterError::PostgresQuery {
+                            query: query.to_string(),
+                            cause: e,
+                        });
                     }
                 } else {
-                    return result;
+                    return Ok(result.unwrap());
                 }
             }
 
-            tokio::time::sleep(backoff_interval).await;
+            sleeper.sleep(backoff_interval).await?;
             backoff_interval += self.default_backoff_interval;
             if backoff_interval > self.max_backoff_interval {
                 backoff_interval = self.max_backoff_interval;
