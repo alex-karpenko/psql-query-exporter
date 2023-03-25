@@ -221,7 +221,8 @@ pub async fn collecting_task(
                     match result {
                         PsqlExporterError::ShutdownSignalReceived => {
                             debug!("collect db task #{handler_index} completed by shutdown signal");
-                            Ok(())},
+                            Ok(())
+                        }
                         _ => {
                             error!("collect db task completed unexpectedly: {result}");
                             Err(result)
