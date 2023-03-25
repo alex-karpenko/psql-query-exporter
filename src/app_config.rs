@@ -1,11 +1,14 @@
 use clap::Parser;
-use std::{net::Ipv4Addr, path::PathBuf, str::FromStr};
+
+use std::{net::Ipv4Addr, str::FromStr};
 
 use tracing::debug;
 use tracing_subscriber::{
     filter::{EnvFilter, LevelFilter},
     fmt,
 };
+
+const INVALID_IP_ADDRESS_ERROR: &str = "IP address isn't valid";
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about)]
@@ -19,7 +22,7 @@ pub struct AppConfig {
     pub verbose: bool,
 
     /// IP/hostname to listen on
-    #[clap(short, long, default_value_t = Ipv4Addr::new(0, 0, 0, 0), value_parser = AppConfig::parse_listen_to_ip)]
+    #[clap(short, long, default_value_t = Ipv4Addr::new(0, 0, 0, 0), value_parser = AppConfig::parse_ip_address)]
     pub listen_on: Ipv4Addr,
 
     /// Port to serve http on
@@ -28,27 +31,22 @@ pub struct AppConfig {
 
     /// Path to config file
     #[clap(long, short)]
-    pub config: PathBuf,
+    pub config: String,
 }
 
 impl AppConfig {
     pub fn new() -> AppConfig {
         let config: AppConfig = Parser::parse();
-
-        AppConfig::configure_logging(&config);
         debug!("Application config: {:?}", config);
 
+        config.setup_logger();
         config
     }
 
-    fn parse_listen_to_ip(ip: &str) -> Result<Ipv4Addr, String> {
-        Ipv4Addr::from_str(ip).map_err(|_| String::from("unable to parse IP address"))
-    }
-
-    fn configure_logging(config: &AppConfig) {
-        let level_filter = if config.debug {
+    fn setup_logger(&self) {
+        let level_filter = if self.debug {
             LevelFilter::DEBUG
-        } else if config.verbose {
+        } else if self.verbose {
             LevelFilter::INFO
         } else {
             LevelFilter::WARN
@@ -62,6 +60,10 @@ impl AppConfig {
             .with_env_filter(log_filter)
             .init();
     }
+
+    fn parse_ip_address(ip: &str) -> Result<Ipv4Addr, String> {
+        Ipv4Addr::from_str(ip).map_err(|_| String::from(INVALID_IP_ADDRESS_ERROR))
+    }
 }
 
 #[cfg(test)]
@@ -71,11 +73,11 @@ mod tests {
     #[test]
     fn parse_correct_ip() {
         assert_eq!(
-            AppConfig::parse_listen_to_ip("1.2.3.4"),
+            AppConfig::parse_ip_address("1.2.3.4"),
             Ok(Ipv4Addr::new(1, 2, 3, 4))
         );
         assert_eq!(
-            AppConfig::parse_listen_to_ip("0.0.0.0"),
+            AppConfig::parse_ip_address("0.0.0.0"),
             Ok(Ipv4Addr::new(0, 0, 0, 0))
         );
     }
@@ -83,18 +85,18 @@ mod tests {
     #[test]
     fn parse_incorrect_ip() {
         assert_eq!(
-            AppConfig::parse_listen_to_ip(".0.0.0"),
-            Err(String::from("unable to parse IP address"))
+            AppConfig::parse_ip_address(".0.0.0"),
+            Err(String::from(INVALID_IP_ADDRESS_ERROR))
         );
 
         assert_eq!(
-            AppConfig::parse_listen_to_ip("qwerty"),
-            Err(String::from("unable to parse IP address"))
+            AppConfig::parse_ip_address("qwerty"),
+            Err(String::from(INVALID_IP_ADDRESS_ERROR))
         );
 
         assert_eq!(
-            AppConfig::parse_listen_to_ip("1.2.3.444"),
-            Err(String::from("unable to parse IP address"))
+            AppConfig::parse_ip_address("1.2.3.444"),
+            Err(String::from(INVALID_IP_ADDRESS_ERROR))
         );
     }
 }

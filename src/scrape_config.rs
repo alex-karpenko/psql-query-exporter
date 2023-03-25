@@ -1,22 +1,23 @@
-use crate::db::PostgresSslMode;
+use crate::{
+    db::{PostgresConnectionString, PostgresSslMode},
+    errors::PsqlExporterError,
+};
 
 use figment::{
     providers::{Format, Yaml},
-    Error, Figment,
+    Figment,
 };
 
 use regex::Regex;
 use serde::Deserialize;
 
-use std::{collections::HashMap, env, path::PathBuf, time::Duration};
+use std::{collections::HashMap, env, fs::read_to_string, time::Duration};
 
 const DEFAULT_SCRAPE_INTERVAL: Duration = Duration::from_secs(1800);
 const DEFAULT_QUERY_TIMEOUT: Duration = Duration::from_secs(10);
 const DEFAULT_METRIC_EXPIRATION_TIME: Duration = Duration::ZERO;
 const DB_CONNECTION_DEFAULT_BACKOFF_INTERVAL: Duration = Duration::from_secs(10);
 const DB_CONNECTION_MAXIMUM_BACKOFF_INTERVAL: Duration = Duration::from_secs(300);
-const DB_APP_NAME: &str = env!("CARGO_PKG_NAME");
-const DB_APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -78,7 +79,7 @@ pub struct ScrapeConfigSource {
 pub struct ScrapeConfigDatabase {
     pub dbname: String,
     #[serde(skip)]
-    pub connection_string: String,
+    pub connection_string: PostgresConnectionString,
     #[serde(skip)]
     pub sslmode: Option<PostgresSslMode>,
     #[serde(with = "humantime_serde", default)]
@@ -165,25 +166,20 @@ pub enum FieldType {
 }
 
 impl ScrapeConfig {
-    pub fn from(filename: &PathBuf) -> ScrapeConfig {
-        let config: Result<ScrapeConfig, Error> =
-            Figment::new().merge(Yaml::file(filename)).extract();
+    pub fn from(filename: &String) -> Result<ScrapeConfig, PsqlExporterError> {
+        let config = read_to_string(filename).map_err(|e| PsqlExporterError::LoadConfigFile {
+            filename: filename.clone(),
+            cause: e,
+        })?;
+        let mut config: ScrapeConfig = Figment::new().merge(Yaml::string(&config)).extract()?;
 
-        let mut config = match config {
-            Ok(config) => config,
-            Err(e) => panic!(
-                "error parsing config file {filename}: {e}",
-                filename = filename.to_str().expect("looks like a BUG")
-            ),
-        };
-
-        config.defaults.merge_env_vars();
-        config.sources.iter_mut().for_each(|(_name, instance)| {
-            instance.merge_env_vars();
+        config.defaults.merge_env_vars()?;
+        for (_name, instance) in config.sources.iter_mut() {
+            instance.merge_env_vars()?;
             instance.propagate_defaults(&config.defaults);
-        });
+        }
 
-        config
+        Ok(config)
     }
 
     pub fn len(&self) -> usize {
@@ -209,16 +205,18 @@ impl Default for ScrapeConfigDefaults {
 }
 
 impl ScrapeConfigDefaults {
-    fn merge_env_vars(&mut self) {
+    fn merge_env_vars(&mut self) -> Result<(), PsqlExporterError> {
         if let Some(rootcert) = self.sslrootcert.clone() {
-            self.sslrootcert = Some(apply_envs_to_string(&rootcert));
+            self.sslrootcert = Some(apply_envs_to_string(&rootcert)?);
         }
         if let Some(cert) = self.sslcert.clone() {
-            self.sslcert = Some(apply_envs_to_string(&cert));
+            self.sslcert = Some(apply_envs_to_string(&cert)?);
         }
         if let Some(key) = self.sslkey.clone() {
-            self.sslkey = Some(apply_envs_to_string(&key));
+            self.sslkey = Some(apply_envs_to_string(&key)?);
         }
+
+        Ok(())
     }
 }
 
@@ -297,29 +295,42 @@ impl ScrapeConfigSource {
         };
 
         self.databases.iter_mut().for_each(|db| {
-            let conn_string = format!("host={host} port={port} dbname={dbname} user={user} password='{password}' sslmode={sslmode} application_name={DB_APP_NAME}-v{DB_APP_VERSION}", host=self.host, port=self.port, user=self.user, password=self.password, sslmode=self.sslmode.clone().unwrap(), dbname=db.dbname);
+            let conn_string = PostgresConnectionString {
+                host: self.host.clone(),
+                port: self.port,
+                user: self.user.clone(),
+                password: self.password.clone(),
+                sslmode: self.sslmode.clone().unwrap(),
+                dbname: db.dbname.clone(),
+            };
             db.propagate_defaults(&defaults, conn_string);
         });
     }
 
-    fn merge_env_vars(&mut self) {
-        self.host = apply_envs_to_string(&self.host);
-        self.user = apply_envs_to_string(&self.user);
-        self.password = apply_envs_to_string(&self.password);
+    fn merge_env_vars(&mut self) -> Result<(), PsqlExporterError> {
+        self.host = apply_envs_to_string(&self.host)?;
+        self.user = apply_envs_to_string(&self.user)?;
+        self.password = apply_envs_to_string(&self.password)?;
         if let Some(rootcert) = self.sslrootcert.clone() {
-            self.sslrootcert = Some(apply_envs_to_string(&rootcert));
+            self.sslrootcert = Some(apply_envs_to_string(&rootcert)?);
         }
         if let Some(cert) = self.sslcert.clone() {
-            self.sslcert = Some(apply_envs_to_string(&cert));
+            self.sslcert = Some(apply_envs_to_string(&cert)?);
         }
         if let Some(key) = self.sslkey.clone() {
-            self.sslkey = Some(apply_envs_to_string(&key));
+            self.sslkey = Some(apply_envs_to_string(&key)?);
         }
+
+        Ok(())
     }
 }
 
 impl ScrapeConfigDatabase {
-    fn propagate_defaults(&mut self, defaults: &ScrapeConfigDefaults, connection_string: String) {
+    fn propagate_defaults(
+        &mut self,
+        defaults: &ScrapeConfigDefaults,
+        connection_string: PostgresConnectionString,
+    ) {
         self.connection_string = connection_string;
         let defaults = ScrapeConfigDefaults {
             scrape_interval: if self.scrape_interval == Duration::default() {
@@ -442,17 +453,20 @@ impl Default for FieldType {
     }
 }
 
-fn apply_envs_to_string(text: &str) -> String {
+fn apply_envs_to_string(text: &str) -> Result<String, PsqlExporterError> {
     let re = Regex::new(r"\$\{[a-zA-Z][A-Za-z0-9_]*\}")
         .unwrap_or_else(|e| panic!("looks like a BUG: {e}"));
     let mut result = text.to_owned();
     for item in re.captures_iter(text) {
         let env_name = item.get(0).expect("looks like a BUG").as_str().to_string();
         let env_name = env_name.trim_start_matches("${").trim_end_matches('}');
-        let env_value = env::var(env_name)
-            .unwrap_or_else(|_| panic!("environment variable '{env_name}' is expected"));
+        let env_value =
+            env::var(env_name).map_err(|e| PsqlExporterError::EnvironmentVariableSubstitution {
+                variable: env_name.to_string(),
+                cause: e,
+            })?;
         result = re.replace_all(&result, env_value).to_string();
     }
 
-    result
+    Ok(result)
 }
