@@ -4,7 +4,10 @@ use crate::{
 };
 
 use serde::Deserialize;
-use std::{fmt::Display, time::Duration};
+use std::{
+    fmt::{Debug, Display},
+    time::Duration,
+};
 use tracing::{debug, error};
 
 use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
@@ -15,7 +18,7 @@ use tokio_postgres::{Client, Row};
 const DB_APP_NAME: &str = env!("CARGO_PKG_NAME");
 const DB_APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct PostgresConnectionString {
     pub host: String,
     pub port: u16,
@@ -26,6 +29,12 @@ pub struct PostgresConnectionString {
 }
 
 impl Display for PostgresConnectionString {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "host={host} port={port} dbname={dbname} user={user} password='***' sslmode={sslmode} application_name={DB_APP_NAME}-v{DB_APP_VERSION}", host=self.host, port=self.port, user=self.user, sslmode=self.sslmode, dbname=self.dbname)
+    }
+}
+
+impl Debug for PostgresConnectionString {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "host={host} port={port} dbname={dbname} user={user} password='***' sslmode={sslmode} application_name={DB_APP_NAME}-v{DB_APP_VERSION}", host=self.host, port=self.port, user=self.user, sslmode=self.sslmode, dbname=self.dbname)
     }
