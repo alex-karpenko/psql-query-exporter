@@ -114,22 +114,25 @@ impl PostgresSslCertificates {
         cert: Option<String>,
         key: Option<String>,
     ) -> Result<Self, PsqlExporterError> {
-        if cert.is_some() && key.is_none() {
-            Err(PsqlExporterError::PostgresTlsClientConfig(format!(
+        match (cert, key) {
+            (Some(cert), None) => Err(PsqlExporterError::PostgresTlsClientConfig(format!(
                 "private key for client certificate {} should be defined.",
-                cert.unwrap()
-            )))
-        } else if cert.is_none() && key.is_some() {
-            Err(PsqlExporterError::PostgresTlsClientConfig(format!(
+                cert
+            ))),
+            (None, Some(key)) => Err(PsqlExporterError::PostgresTlsClientConfig(format!(
                 "client certificate for private key {} should be defined.",
-                key.unwrap()
-            )))
-        } else {
-            Ok(Self {
+                key
+            ))),
+            (Some(cert), Some(key)) => Ok(Self {
                 rootcert,
-                cert,
-                key,
-            })
+                cert: Some(cert),
+                key: Some(key),
+            }),
+            (None, None) => Ok(Self {
+                rootcert,
+                cert: None,
+                key: None,
+            }),
         }
     }
 
