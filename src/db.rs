@@ -156,74 +156,7 @@ impl PostgresConnection {
         let mut sleeper = SleepHelper::from(shutdown_channel.clone());
 
         loop {
-            let mut connector = SslConnector::builder(SslMethod::tls())
-                .map_err(PsqlExporterError::PostgresTlsConnector)?;
-
-            match sslmode {
-                PostgresSslMode::Disable => connector.set_verify(SslVerifyMode::NONE),
-                PostgresSslMode::Prefer => connector.set_verify(SslVerifyMode::NONE),
-                PostgresSslMode::Require => connector.set_verify(SslVerifyMode::NONE),
-                PostgresSslMode::VerifyCa => {
-                    connector.set_verify_callback(
-                        SslVerifyMode::PEER,
-                        |verify_indicator, x509_result| {
-                            let allowed_errors: Vec<i32> = vec![
-                                openssl_sys::X509_V_ERR_IP_ADDRESS_MISMATCH,
-                                openssl_sys::X509_V_ERR_HOSTNAME_MISMATCH,
-                                openssl_sys::X509_V_ERR_EMAIL_MISMATCH,
-                            ];
-                            debug!(
-                                "verify_callback, indicator={}, x509_result={}",
-                                verify_indicator,
-                                x509_result.error()
-                            );
-
-                            if !verify_indicator
-                                && allowed_errors.contains(&x509_result.error().as_raw())
-                            {
-                                true
-                            } else {
-                                verify_indicator
-                            }
-                        },
-                    );
-                }
-                PostgresSslMode::VerifyFull => connector.set_verify(SslVerifyMode::PEER),
-            };
-
-            if let Some(rootcert) = certificates.rootcert.as_ref() {
-                debug!("loading CA bundle from {}", rootcert);
-                connector.set_ca_file(rootcert).map_err(|e| {
-                    PsqlExporterError::PostgresTlsRootCertificate {
-                        rootcert: (*rootcert).clone(),
-                        cause: e,
-                    }
-                })?;
-            }
-
-            if certificates.has_client_cert() {
-                if let Some(cert) = certificates.cert.as_ref() {
-                    debug!("loading client certificate from {}", cert);
-                    connector
-                        .set_certificate_file(cert, SslFiletype::PEM)
-                        .map_err(|e| PsqlExporterError::PostgresTlsClientCertificate {
-                            filename: (*cert).clone(),
-                            cause: e,
-                        })?;
-                }
-
-                if let Some(key) = certificates.key.as_ref() {
-                    debug!("loading client private key from {}", key);
-                    connector
-                        .set_private_key_file(key, SslFiletype::PEM)
-                        .map_err(|e| PsqlExporterError::PostgresTlsClientCertificate {
-                            filename: (*key).clone(),
-                            cause: e,
-                        })?;
-                }
-            }
-
-            let connector = MakeTlsConnector::new(connector.build());
+            let connector = Self::build_tls_connector(&sslmode, &certificates)?;
             let connection =
                 tokio_postgres::connect(&db_connection_string.get_conn_string(), connector).await;
 
@@ -260,29 +193,79 @@ impl PostgresConnection {
         }
     }
 
-    async fn reconnect(&mut self) -> Result<&Self, PsqlExporterError> {
-        debug!("PostgresConnection::reconnect: try to reconnect");
-        let new_connection = PostgresConnection::new(
-            self.db_connection_string.clone(),
-            self.sslmode.clone(),
-            self.certificates.clone(),
-            self.default_backoff_interval,
-            self.max_backoff_interval,
-            self.shutdown_channel.clone(),
-        )
-        .await;
+    fn build_tls_connector(
+        sslmode: &PostgresSslMode,
+        certificates: &PostgresSslCertificates,
+    ) -> Result<MakeTlsConnector, PsqlExporterError> {
+        let mut connector = SslConnector::builder(SslMethod::tls())
+            .map_err(PsqlExporterError::PostgresTlsConnector)?;
 
-        match new_connection {
-            Ok(conn) => {
-                self.client = conn.client;
-                self.connection_handler = conn.connection_handler;
-                Ok(self)
+        match *sslmode {
+            PostgresSslMode::Disable => connector.set_verify(SslVerifyMode::NONE),
+            PostgresSslMode::Prefer => connector.set_verify(SslVerifyMode::NONE),
+            PostgresSslMode::Require => connector.set_verify(SslVerifyMode::NONE),
+            PostgresSslMode::VerifyCa => {
+                connector.set_verify_callback(
+                    SslVerifyMode::PEER,
+                    |verify_indicator, x509_result| {
+                        let allowed_errors: Vec<i32> = vec![
+                            openssl_sys::X509_V_ERR_IP_ADDRESS_MISMATCH,
+                            openssl_sys::X509_V_ERR_HOSTNAME_MISMATCH,
+                            openssl_sys::X509_V_ERR_EMAIL_MISMATCH,
+                        ];
+                        debug!(
+                            "verify_callback, indicator={}, x509_result={}",
+                            verify_indicator,
+                            x509_result.error()
+                        );
+
+                        if !verify_indicator
+                            && allowed_errors.contains(&x509_result.error().as_raw())
+                        {
+                            true
+                        } else {
+                            verify_indicator
+                        }
+                    },
+                );
             }
-            Err(e) => {
-                error!("PostgresConnection::reconnect: can't reconnect: {e}");
-                Err(e)
+            PostgresSslMode::VerifyFull => connector.set_verify(SslVerifyMode::PEER),
+        };
+
+        if let Some(rootcert) = certificates.rootcert.as_ref() {
+            debug!("loading CA bundle from {}", rootcert);
+            connector.set_ca_file(rootcert).map_err(|e| {
+                PsqlExporterError::PostgresTlsRootCertificate {
+                    rootcert: (*rootcert).clone(),
+                    cause: e,
+                }
+            })?;
+        }
+
+        if certificates.has_client_cert() {
+            if let Some(cert) = certificates.cert.as_ref() {
+                debug!("loading client certificate from {}", cert);
+                connector
+                    .set_certificate_file(cert, SslFiletype::PEM)
+                    .map_err(|e| PsqlExporterError::PostgresTlsClientCertificate {
+                        filename: (*cert).clone(),
+                        cause: e,
+                    })?;
+            }
+
+            if let Some(key) = certificates.key.as_ref() {
+                debug!("loading client private key from {}", key);
+                connector
+                    .set_private_key_file(key, SslFiletype::PEM)
+                    .map_err(|e| PsqlExporterError::PostgresTlsClientCertificate {
+                        filename: (*key).clone(),
+                        cause: e,
+                    })?;
             }
         }
+
+        let connector = MakeTlsConnector::new(connector.build());
+        Ok(connector)
     }
 
     pub async fn query(
@@ -333,6 +316,31 @@ impl PostgresConnection {
             backoff_interval += self.default_backoff_interval;
             if backoff_interval > self.max_backoff_interval {
                 backoff_interval = self.max_backoff_interval;
+            }
+        }
+    }
+
+    async fn reconnect(&mut self) -> Result<&Self, PsqlExporterError> {
+        debug!("PostgresConnection::reconnect: try to reconnect");
+        let new_connection = PostgresConnection::new(
+            self.db_connection_string.clone(),
+            self.sslmode.clone(),
+            self.certificates.clone(),
+            self.default_backoff_interval,
+            self.max_backoff_interval,
+            self.shutdown_channel.clone(),
+        )
+        .await;
+
+        match new_connection {
+            Ok(conn) => {
+                self.client = conn.client;
+                self.connection_handler = conn.connection_handler;
+                Ok(self)
+            }
+            Err(e) => {
+                error!("PostgresConnection::reconnect: can't reconnect: {e}");
+                Err(e)
             }
         }
     }
