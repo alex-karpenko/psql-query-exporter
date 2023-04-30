@@ -13,6 +13,7 @@ keywords = ["postgres", "postgresql", "prometheus", "exporter"]
 [dependencies]
 clap = {version = "4.1", features = ["derive"]}
 figment = { version = "0.10", features = ["yaml", "env"] }
+human-repr = "1"
 humantime-serde = "1.1"
 openssl = "0.10"
 openssl-sys = "0.9"
