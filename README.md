@@ -25,21 +25,19 @@ docker run --rm alexkarpenko/psql-query-exporter:latest
 Typical output is:
 
 ```console
-psql-query-exporter 0.1.0
-Oleksii Karpenko <alexkarpenko@yahoo.com>
 PostgreSQL Query Prometheus exporter
 
-USAGE:
-    psql-query-exporter [OPTIONS] --config <CONFIG>
+Usage: psql-query-exporter [OPTIONS] --config <CONFIG>
 
-OPTIONS:
-    -c, --config <CONFIG>          Path to config file
-    -d, --debug                    Enable extreme logging (debug)
-    -h, --help                     Print help information
-    -l  --listen-on <LISTEN_ON>    IP/hostname to listen on [default: 0.0.0.0]
-    -p  --port <PORT>              Port to serve http on [default: 9090]
-    -v, --verbose                  Enable additional logging (info)
-    -V, --version                  Print version information
+Options:
+  -d, --debug                  Enable extreme logging (debug)
+  -v, --verbose                Enable additional logging (info)
+  -j, --json-log               Write logs in JSON format
+  -l, --listen-on <LISTEN_ON>  IP/hostname to listen on [default: 0.0.0.0]
+  -p, --port <PORT>            Port to serve http on [default: 9090]
+  -c, --config <CONFIG>        Path to config file
+  -h, --help                   Print help
+  -V, --version                Print version
 ```
 
 The only mandatory parameter is a path to configuration file. Detailed explanation of all possible configuration options is in the dedicated [Configuration](#configuration) section. Just for test purpose, there is an [example config](config.yaml) file to query PostgreSQL server at `localhost` for replication lag values. To use it:

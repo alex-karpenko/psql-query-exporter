@@ -12,10 +12,12 @@ use prometheus::{
 use tokio::sync::mpsc;
 use tokio_postgres::Row;
 
+use human_repr::HumanDuration;
+
 use std::convert::Infallible;
 use std::time::{Duration, SystemTime};
 
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 #[derive(Debug)]
 pub enum MetricWithType {
@@ -354,13 +356,24 @@ async fn collect_one_db_instance(
             .map(|x| x.next_query_time)
             .expect("looks like a BUG");
 
+        let sleep_time;
+
         if next_query_time > SystemTime::now() {
-            let sleep_time = next_query_time
+            sleep_time = next_query_time
                 .duration_since(SystemTime::now())
                 .unwrap_or(Duration::from_micros(0));
+        } else {
+            sleep_time = Duration::from_micros(0);
 
-            sleeper.sleep(sleep_time).await?;
+            let slip_duration = SystemTime::now().duration_since(next_query_time).unwrap();
+            let slip_duration = slip_duration.human_duration();
+            warn!(
+                "query loop of DB '{}' lasts too long for {}",
+                database.dbname, slip_duration
+            );
         }
+
+        sleeper.sleep(sleep_time).await?;
     }
 }
 

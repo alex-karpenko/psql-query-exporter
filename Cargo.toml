@@ -13,6 +13,7 @@ keywords = ["postgres", "postgresql", "prometheus", "exporter"]
 [dependencies]
 clap = {version = "4.1", features = ["derive"]}
 figment = { version = "0.10", features = ["yaml", "env"] }
+human-repr = "1"
 humantime-serde = "1.1"
 openssl = "0.10"
 openssl-sys = "0.9"
@@ -24,5 +25,5 @@ thiserror = "1.0"
 tokio = { version = "1", features = ["full"] }
 tokio-postgres = "0.7"
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 warp = "0.3"
