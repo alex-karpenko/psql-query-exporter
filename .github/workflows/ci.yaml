@@ -10,41 +10,28 @@ jobs:
         rust:
           - stable
           - beta
-#          - nightly
           - 1.64.0  # MSRV
 
     steps:
       - uses: actions/checkout@v3
 
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
         name: Setup toolchain
         with:
-          profile: minimal
           toolchain: ${{ matrix.rust }}
-          override: true
           components: rustfmt, clippy
 
-      - uses: actions-rs/cargo@v1
-        name: Build
-        with:
-          command: build
+      - name: Build
+        run: cargo build
 
-      - uses: actions-rs/cargo@v1
-        name: Test
-        with:
-          command: test
+      - name: Test
+        run: cargo test
 
-      - uses: actions-rs/cargo@v1
-        name: Fmt
-        with:
-          command: fmt
-          args: --all -- --check
+      - name: Fmt
+        run: cargo fmt --all -- --check
 
-      - uses: actions-rs/cargo@v1
-        name: Clippy
-        with:
-          command: clippy
-          args: -- -D warnings
+      - name: Clippy
+        run: cargo clippy -- -D warnings
 
   docker-test:
     runs-on: ubuntu-latest
