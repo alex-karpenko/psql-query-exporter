@@ -21,6 +21,10 @@ pub struct AppConfig {
     #[clap(short, long)]
     pub verbose: bool,
 
+    /// Write logs in JSON format
+    #[clap(short, long)]
+    pub json_log: bool,
+
     /// IP/hostname to listen on
     #[clap(short, long, default_value_t = Ipv4Addr::new(0, 0, 0, 0), value_parser = AppConfig::parse_ip_address)]
     pub listen_on: Ipv4Addr,
@@ -53,12 +57,16 @@ impl AppConfig {
         };
 
         let log_filter = EnvFilter::from_default_env().add_directive(level_filter.into());
-        let log_format = fmt::format().with_level(true).with_target(true).compact();
+        let log_format = fmt::format().with_level(true).with_target(self.debug);
 
-        tracing_subscriber::fmt()
-            .event_format(log_format)
-            .with_env_filter(log_filter)
-            .init();
+        let subscriber = tracing_subscriber::fmt().with_env_filter(log_filter);
+        if self.json_log {
+            subscriber
+                .event_format(log_format.json().flatten_event(true))
+                .init();
+        } else {
+            subscriber.event_format(log_format.compact()).init();
+        };
     }
 
     fn parse_ip_address(ip: &str) -> Result<Ipv4Addr, String> {
