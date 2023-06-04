@@ -4,5 +4,5 @@
 /config-dev.yaml
 /config-local.yaml
 .vscode
-/tests/**
+/tests/
 /*.pem
