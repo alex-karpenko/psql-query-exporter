@@ -8,7 +8,7 @@ RUN cargo build --release
 RUN strip target/release/psql-query-exporter
 
 # Runtime stage
-FROM debian:12-slim
+FROM debian:11-slim
 
 RUN apt update && apt install -y ca-certificates && apt clean
 
