@@ -5,7 +5,7 @@ on:
   push:
     branches:
       - main
-    paths: 
+    paths:
       - '**/Cargo.toml'
       - '**/Cargo.lock'
 
@@ -13,5 +13,5 @@ jobs:
   security-audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: EmbarkStudios/cargo-deny-action@v1
