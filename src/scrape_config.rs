@@ -259,28 +259,28 @@ impl ScrapeConfigSource {
             },
             metric_prefix: match self.metric_prefix {
                 None => {
-                    self.metric_prefix = defaults.metric_prefix.clone();
+                    self.metric_prefix.clone_from(&defaults.metric_prefix);
                     defaults.metric_prefix.clone()
                 }
                 _ => self.metric_prefix.clone(),
             },
             sslrootcert: match self.sslrootcert {
                 None => {
-                    self.sslrootcert = defaults.sslrootcert.clone();
+                    self.sslrootcert.clone_from(&defaults.sslrootcert);
                     defaults.sslrootcert.clone()
                 }
                 _ => self.sslrootcert.clone(),
             },
             sslcert: match self.sslcert {
                 None => {
-                    self.sslcert = defaults.sslcert.clone();
+                    self.sslcert.clone_from(&defaults.sslcert);
                     defaults.sslcert.clone()
                 }
                 _ => self.sslcert.clone(),
             },
             sslkey: match self.sslkey {
                 None => {
-                    self.sslkey = defaults.sslkey.clone();
+                    self.sslkey.clone_from(&defaults.sslkey);
                     defaults.sslkey.clone()
                 }
                 _ => self.sslkey.clone(),
@@ -365,28 +365,28 @@ impl ScrapeConfigDatabase {
             },
             metric_prefix: match self.metric_prefix {
                 None => {
-                    self.metric_prefix = defaults.metric_prefix.clone();
+                    self.metric_prefix.clone_from(&defaults.metric_prefix);
                     defaults.metric_prefix.clone()
                 }
                 _ => self.metric_prefix.clone(),
             },
             sslrootcert: match self.sslrootcert {
                 None => {
-                    self.sslrootcert = defaults.sslrootcert.clone();
+                    self.sslrootcert.clone_from(&defaults.sslrootcert);
                     defaults.sslrootcert.clone()
                 }
                 _ => self.sslrootcert.clone(),
             },
             sslcert: match self.sslcert {
                 None => {
-                    self.sslcert = defaults.sslcert.clone();
+                    self.sslcert.clone_from(&defaults.sslcert);
                     defaults.sslcert.clone()
                 }
                 _ => self.sslcert.clone(),
             },
             sslkey: match self.sslkey {
                 None => {
-                    self.sslkey = defaults.sslkey.clone();
+                    self.sslkey.clone_from(&defaults.sslkey);
                     defaults.sslkey.clone()
                 }
                 _ => self.sslkey.clone(),
