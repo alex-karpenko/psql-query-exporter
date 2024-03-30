@@ -1,35 +1,19 @@
+[graph]
 targets = []
-#exclude = []
 all-features = false
 no-default-features = false
-#features = []
-feature-depth = 1
 
 [advisories]
 db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
-vulnerability = "deny"
-unmaintained = "deny"
-unsound = "deny"
 yanked = "deny"
-notice = "deny"
-ignore = [
-    #"RUSTSEC-0000-0000",
-]
-#severity-threshold =
-
-#git-fetch-with-cli = true
+ignore = []
 
 [licenses]
-unlicensed = "deny"
 allow = [
     "MIT",
     "Apache-2.0",
 ]
-deny = []
-copyleft = "deny"
-allow-osi-fsf-free = "neither"
-default = "deny"
 confidence-threshold = 0.93
 exceptions = [
     { allow = ["Zlib"], name = "tinyvec" },
@@ -38,19 +22,9 @@ exceptions = [
     { allow = ["BSD-3-Clause"], name = "encoding_rs" }
 ]
 
-#[[licenses.clarify]]
-#name = "ring"
-#version = "*"
-#license-files = [
-    # Each entry is a crate relative path, and the (opaque) hash of its contents
-    #{ path = "LICENSE", hash = 0xbd0eed23 }
-#]
-
 [licenses.private]
 ignore = false
-registries = [
-    #"https://sekretz.com/registry
-]
+registries = []
 
 [bans]
 multiple-versions = "allow"
@@ -58,41 +32,10 @@ wildcards = "allow"
 highlight = "all"
 workspace-default-features = "allow"
 external-default-features = "allow"
-allow = [
-    #{ name = "ansi_term", version = "=0.11.0" },
-]
-deny = [
-    # Each entry the name of a crate and a version range. If version is
-    # not specified, all versions will be matched.
-    #{ name = "ansi_term", version = "=0.11.0" },
-    #
-    # Wrapper crates can optionally be specified to allow the crate when it
-    # is a direct dependency of the otherwise banned crate
-    #{ name = "ansi_term", version = "=0.11.0", wrappers = [] },
-]
-
-#[[bans.features]]
-#name = "reqwest"
-#deny = ["json"]
-#allow = [
-#    "rustls",
-#    "__rustls",
-#    "__tls",
-#    "hyper-rustls",
-#    "rustls",
-#    "rustls-pemfile",
-#    "rustls-tls-webpki-roots",
-#    "tokio-rustls",
-#    "webpki-roots",
-#]
-#exact = true
-
-skip = [
-    #{ name = "ansi_term", version = "=0.11.0" },
-]
-skip-tree = [
-    #{ name = "ansi_term", version = "=0.11.0", depth = 20 },
-]
+allow = []
+deny = []
+skip = []
+skip-tree = []
 
 [sources]
 unknown-registry = "deny"
@@ -100,7 +43,5 @@ unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 allow-git = []
 
-[sources.allow-org]
-#github = [""]
-#gitlab = [""]
-#bitbucket = [""]
+[output]
+feature-depth = 1
