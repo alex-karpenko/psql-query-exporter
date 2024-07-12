@@ -1,4 +1,7 @@
-on: pull_request
+on:
+  pull_request:
+  schedule:
+    - cron: "17 5 * * 5"
 
 name: Continuous integration
 
