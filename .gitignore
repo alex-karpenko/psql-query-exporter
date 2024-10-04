@@ -7,3 +7,4 @@
 /tests/
 /*.pem
 /.idea
+.DS_Store
