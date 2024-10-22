@@ -1,4 +1,4 @@
-ARG RUST_VERSION=1.81-bookworm
+ARG RUST_VERSION=1.82-bookworm
 FROM rust:${RUST_VERSION} AS builder
 
 WORKDIR /src
