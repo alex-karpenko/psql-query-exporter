@@ -1034,7 +1034,7 @@ checksum = "106dd99e98437432fed6519dedecfade6a06a73bb7b2a1e019fdd2bee5778d94"
 
 [[package]]
 name = "psql-query-exporter"
-version = "0.2.23"
+version = "0.2.24"
 dependencies = [
  "clap",
  "figment",
