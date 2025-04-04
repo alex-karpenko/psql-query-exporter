@@ -2,18 +2,16 @@ use crate::{
     errors::PsqlExporterError,
     utils::{ShutdownReceiver, SleepHelper},
 };
-
+use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
+use postgres_openssl::MakeTlsConnector;
 use serde::Deserialize;
 use std::{
     fmt::{Debug, Display},
     time::Duration,
 };
-use tracing::{debug, error};
-
-use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
-use postgres_openssl::MakeTlsConnector;
 use tokio::task::JoinHandle;
 use tokio_postgres::{Client, Row};
+use tracing::{debug, error};
 
 const DB_APP_NAME: &str = env!("CARGO_PKG_NAME");
 const DB_APP_VERSION: &str = env!("CARGO_PKG_VERSION");

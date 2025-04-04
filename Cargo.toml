@@ -12,8 +12,7 @@ keywords = ["postgres", "postgresql", "prometheus", "exporter"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-clap = { version = "4.5.23", features = ["derive"] }
-figment = { version = "0.10.19", features = ["yaml", "env"] }
+clap = { version = "4.5.35", features = ["derive"] }
 human-repr = "1.1.0"
 humantime-serde = "1.1.1"
 openssl = "0.10.70"
@@ -22,7 +21,8 @@ postgres-openssl = "0.5.0"
 prometheus = "0.14.0"
 regex = "1.11.1"
 serde = { version = "1.0.215", features = ["derive"] }
-thiserror = "2.0.11"
+serde_yaml_ng = "0.10.0"
+thiserror = "2.0.12"
 tokio = { version = "1.43.0", features = ["full"] }
 tokio-postgres = "0.7.12"
 tracing = "0.1.41"
