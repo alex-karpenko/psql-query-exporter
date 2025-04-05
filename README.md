@@ -98,7 +98,7 @@ config:
             - metric_name: replication_lag
               description: Storage size and state of replication slots
               query: |
-                select slot_name, slot_type, active::text, 
+                select slot_name, slot_type, active::text,
                 (case when not pg_is_in_recovery() then pg_current_wal_lsn() - restart_lsn end)::float as lag_bytes
                 from pg_replication_slots;
               values:
@@ -140,10 +140,10 @@ defaults:
   scrape_interval: 30m  # interval to run each query,
                         # may be overridden by source/db/query config
 
-  query_timeout: 10s    # timeout to wait for a result of each query, 
+  query_timeout: 10s    # timeout to wait for a result of each query,
                         # may be overridden by source/db/query config
 
-  metric_prefix: ""     # prefix for metric name, 
+  metric_prefix: ""     # prefix for metric name,
                         # may be overridden by source/db/query config
 
   sslmode: prefer       # SSL mode to connect to the DB, optional,
@@ -159,12 +159,12 @@ defaults:
                         # may be overridden by source config
 
   metric_expiration_time: 0s # if all query attempts during this time were failed,
-                             # then metric should be excluded from the output 
+                             # then metric should be excluded from the output
                              # until first successful query execution
 
   backoff_interval: 10s # default interval between failed connection attempts
   max_backoff_interval: 300s # every time after failed connection to the DB
-                             # interval between connection attempts increases 
+                             # interval between connection attempts increases
                              # by value of backoff_interval, but no more than value
                              # of the max_backoff_interval
 
@@ -236,11 +236,11 @@ sources:
                         # overrides value from the default section,
                         # can be overridden in the DB/query section
     metric_expiration_time: 0s  # if all query attempts during this time were failed,
-                                # then metric should be excluded from the output 
+                                # then metric should be excluded from the output
                                 # until first successful query execution
     backoff_interval: 10s # default interval between failed connection attempts
     max_backoff_interval: 300s # every time after failed connection to the DB
-                              # interval between connection attempts increases 
+                              # interval between connection attempts increases
                               # by value of backoff_interval, but no more than value
                               # of the max_backoff_interval
     metric_prefix: "" # will be added to names of the all metrics for these DBs/queries, optional,
@@ -252,11 +252,11 @@ sources:
         scrape_interval: 30m  # the same as above, applied to all queries of the DB, optional
         query_timeout: 10s    # the same as above, applied to all queries of the DB, optional
         metric_expiration_time: 0s  # if all query attempts during this time were failed,
-                                    # then metric should be excluded from the output 
+                                    # then metric should be excluded from the output
                                     # until first successful query execution
         backoff_interval: 10s # default interval between failed connection attempts
         max_backoff_interval: 300s # every time after failed connection to the DB
-                                  # interval between connection attempts increases 
+                                  # interval between connection attempts increases
                                   # by value of backoff_interval, but no more than value
                                   # of the max_backoff_interval
         metric_prefix: ""     # the same as above, applied to all queries of the DB, optional
@@ -271,7 +271,7 @@ sources:
             scrape_interval: 30m  # the same as above, applied to this query, optional
             query_timeout: 10s    # the same as above, applied to this query, optional
             metric_expiration_time: 0s  # if all query attempts during this time were failed,
-                                        # then metric should be excluded from the output 
+                                        # then metric should be excluded from the output
                                         # until first successful query execution
             metric_prefix: ""     # the same as above, applied to this query, optional
 
