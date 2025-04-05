@@ -16,7 +16,7 @@ sources:
         queries:
           - metric_name: replication_lag
             query: |
-              select slot_name, slot_type, active::text, 
+              select slot_name, slot_type, active::text,
               (case when not pg_is_in_recovery() then pg_current_wal_lsn() - restart_lsn end)::float as lag_bytes
               from pg_replication_slots;
             values:
