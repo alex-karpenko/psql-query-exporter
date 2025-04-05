@@ -12,6 +12,7 @@ keywords = ["postgres", "postgresql", "prometheus", "exporter"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+axum = { version = "0.8.3", default-features = false, features = ["tokio", "http1"] }
 clap = { version = "4.5.35", features = ["derive"] }
 human-repr = "1.1.0"
 humantime-serde = "1.1.1"
@@ -27,4 +28,3 @@ tokio = { version = "1.43.0", features = ["full"] }
 tokio-postgres = "0.7.12"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter", "json"] }
-warp = "0.3.7"
