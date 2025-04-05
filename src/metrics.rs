@@ -4,19 +4,15 @@ use crate::scrape_config::{
     FieldType, ScrapeConfig, ScrapeConfigDatabase, ScrapeConfigQuery, ScrapeConfigValues,
 };
 use crate::utils::{ShutdownReceiver, SleepHelper};
-
+use human_repr::HumanDuration;
 use prometheus::core::{AtomicF64, AtomicI64, Collector, GenericGauge, GenericGaugeVec};
 use prometheus::{
     opts, Encoder, Gauge, GaugeVec, IntGauge, IntGaugeVec, Opts, Registry, TextEncoder,
 };
-use tokio::sync::mpsc;
-use tokio_postgres::Row;
-
-use human_repr::HumanDuration;
-
 use std::convert::Infallible;
 use std::time::{Duration, SystemTime};
-
+use tokio::sync::mpsc;
+use tokio_postgres::Row;
 use tracing::{debug, error, info, warn};
 
 #[derive(Debug)]
@@ -50,7 +46,7 @@ impl QueryMetrics {
         let mut metrics: Vec<MetricWithType> = vec![];
 
         match &query_config.values {
-            ScrapeConfigValues::ValueFrom(values) => {
+            ScrapeConfigValues::ValueFrom { single: values } => {
                 let mut opts = opts!(
                     query_config.metric_name.clone(),
                     query_config.description.clone().unwrap()
@@ -70,7 +66,9 @@ impl QueryMetrics {
                 metrics.push(new_metric);
             }
 
-            ScrapeConfigValues::ValuesWithLabels(values) => {
+            ScrapeConfigValues::ValuesWithLabels {
+                multi_labels: values,
+            } => {
                 for value in values {
                     let mut opts = opts!(
                         query_config.metric_name.clone(),
@@ -98,7 +96,9 @@ impl QueryMetrics {
                 }
             }
 
-            ScrapeConfigValues::ValuesWithSuffixes(values) => {
+            ScrapeConfigValues::ValuesWithSuffixes {
+                multi_suffixes: values,
+            } => {
                 for value in values {
                     let metric_name = format!("{}_{}", query_config.metric_name, value.suffix);
                     let metric_desc = format!(
@@ -294,7 +294,7 @@ async fn collect_one_db_instance(
                 Ok(result) => {
                     query_metrics[index].register(registry);
                     match &query_item.values {
-                        ScrapeConfigValues::ValueFrom(value) => {
+                        ScrapeConfigValues::ValueFrom { single: value } => {
                             if let Some(field) = &value.field {
                                 update_metrics(
                                     &result,
@@ -311,7 +311,9 @@ async fn collect_one_db_instance(
                                 )
                             }
                         }
-                        ScrapeConfigValues::ValuesWithLabels(values) => {
+                        ScrapeConfigValues::ValuesWithLabels {
+                            multi_labels: values,
+                        } => {
                             for (value, metric) in values.iter().zip(&query_metrics[index].metrics)
                             {
                                 update_metrics(
@@ -322,7 +324,9 @@ async fn collect_one_db_instance(
                                 )
                             }
                         }
-                        ScrapeConfigValues::ValuesWithSuffixes(values) => {
+                        ScrapeConfigValues::ValuesWithSuffixes {
+                            multi_suffixes: values,
+                        } => {
                             for (value, metric) in values.iter().zip(&query_metrics[index].metrics)
                             {
                                 update_metrics(

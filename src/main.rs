@@ -7,11 +7,9 @@ mod utils;
 
 use app_config::AppConfig;
 use scrape_config::ScrapeConfig;
-use utils::SignalHandler;
-
 use std::error::Error;
 use tracing::{info, instrument};
-
+use utils::SignalHandler;
 use warp::Filter;
 
 const HOME_PAGE_CONTENT: &str = include_str!("../assets/index.html");

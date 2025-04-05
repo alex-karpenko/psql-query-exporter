@@ -1,7 +1,5 @@
 use clap::Parser;
-
 use std::{net::Ipv4Addr, str::FromStr};
-
 use tracing::debug;
 use tracing_subscriber::{
     filter::{EnvFilter, LevelFilter},

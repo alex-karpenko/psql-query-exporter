@@ -5,10 +5,10 @@ use thiserror::Error;
 pub enum PsqlExporterError {
     #[error("unable to load config file '{}': {}", .filename, .cause)]
     LoadConfigFile { filename: String, cause: io::Error },
-    #[error("unable to parse config: {}", .cause.kind)]
+    #[error("unable to parse config: {}", .cause)]
     ParseConfigFile {
         #[from]
-        cause: figment::Error,
+        cause: serde_yaml_ng::Error,
     },
     #[error("unable to substitute environment variable '{}': {}", .variable, .cause)]
     EnvironmentVariableSubstitution {

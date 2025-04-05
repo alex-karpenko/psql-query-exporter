@@ -2,15 +2,8 @@ use crate::{
     db::{PostgresConnectionString, PostgresSslMode},
     errors::PsqlExporterError,
 };
-
-use figment::{
-    providers::{Format, Yaml},
-    Figment,
-};
-
 use regex::Regex;
 use serde::Deserialize;
-
 use std::{collections::HashMap, env, fs::read_to_string, time::Duration};
 
 const DEFAULT_SCRAPE_INTERVAL: Duration = Duration::from_secs(1800);
@@ -118,18 +111,20 @@ pub struct ScrapeConfigQuery {
     #[serde(default)]
     pub var_labels: Option<Vec<String>>,
     #[serde(default)]
-    pub values: ScrapeConfigValues, // These two vectors have the same size
+    pub values: ScrapeConfigValues,
 }
 
 #[derive(Deserialize, Debug)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, untagged)]
 pub enum ScrapeConfigValues {
     #[serde(rename = "single")]
-    ValueFrom(FieldWithType),
+    ValueFrom { single: FieldWithType },
     #[serde(rename = "multi_labels")]
-    ValuesWithLabels(Vec<FieldWithLabels>),
+    ValuesWithLabels { multi_labels: Vec<FieldWithLabels> },
     #[serde(rename = "multi_suffixes")]
-    ValuesWithSuffixes(Vec<FieldWithSuffix>),
+    ValuesWithSuffixes {
+        multi_suffixes: Vec<FieldWithSuffix>,
+    },
 }
 
 #[derive(Deserialize, Debug)]
@@ -158,9 +153,10 @@ pub struct FieldWithSuffix {
     pub suffix: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 #[serde(deny_unknown_fields, rename_all = "lowercase")]
 pub enum FieldType {
+    #[default]
     Int,
     Float,
 }
@@ -171,7 +167,7 @@ impl ScrapeConfig {
             filename: filename.clone(),
             cause: e,
         })?;
-        let mut config: ScrapeConfig = Figment::new().merge(Yaml::string(&config)).extract()?;
+        let mut config: ScrapeConfig = serde_yaml_ng::from_str(&config)?;
 
         config.defaults.merge_env_vars()?;
         for (_name, instance) in config.sources.iter_mut() {
@@ -440,16 +436,12 @@ impl ScrapeConfigQuery {
 
 impl Default for ScrapeConfigValues {
     fn default() -> Self {
-        Self::ValueFrom(FieldWithType {
-            field: None,
-            field_type: FieldType::Int,
-        })
-    }
-}
-
-impl Default for FieldType {
-    fn default() -> Self {
-        Self::Int
+        Self::ValueFrom {
+            single: FieldWithType {
+                field: None,
+                field_type: FieldType::Int,
+            },
+        }
     }
 }
 

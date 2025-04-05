@@ -1,3 +1,4 @@
+use crate::errors::PsqlExporterError;
 use std::{
     error::Error,
     time::{Duration, SystemTime},
@@ -8,9 +9,6 @@ use tokio::{
     sync::watch,
 };
 use tracing::{debug, error, info};
-
-use crate::errors::PsqlExporterError;
-
 pub type ShutdownReceiver = watch::Receiver<bool>;
 pub type ShutdownSender = watch::Sender<bool>;
 
