@@ -20,7 +20,6 @@ pub enum PsqlExporterError {
         query: String,
         cause: tokio_postgres::Error,
     },
-    /// Process query result failed
     #[error("failed to process query results: {0}")]
     PostgresQueryProcessing(#[from] tokio_postgres::error::Error),
     #[error("unable to create TLS connector: {}", .0)]

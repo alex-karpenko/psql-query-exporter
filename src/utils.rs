@@ -5,7 +5,7 @@ use tokio::{
     signal::unix::{signal, Signal, SignalKind},
     sync::watch,
 };
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, instrument};
 pub type ShutdownReceiver = watch::Receiver<bool>;
 pub type ShutdownSender = watch::Sender<bool>;
 
@@ -39,12 +39,13 @@ impl SignalHandler {
         self.shutdown_channel_rx.clone()
     }
 
+    #[instrument("SignalHandler", skip_all)]
     pub async fn shutdown_on_signal(&mut self) {
         let signal = self.wait_for_signal().await;
 
-        info!("{signal} signal has been received, shutting down");
+        info!(%signal,  "shutting down");
         if let Err(e) = self.shutdown_channel_tx.send(true) {
-            error!("can't send shutdown message: {}", e);
+            error!(error = %e, "can't send shutdown message");
         };
 
         debug!("shutdown message has been sent, waiting until all task stopped");
@@ -71,13 +72,16 @@ impl SleepHelper {
         Self { shutdown_channel }
     }
 
+    #[instrument("SleepHandler", skip_all, fields(duration=?sleep_time))]
     pub async fn sleep(&mut self, sleep_time: Duration) -> Result<(), PsqlExporterError> {
         select! {
             _ = self.shutdown_channel.changed() => {
-                debug!("sleep: shutdown signal has been received");
+                debug!("shutdown signal has been received");
                 return Err(PsqlExporterError::ShutdownSignalReceived);
             },
-            _ = tokio::time::sleep(sleep_time) => {}
+            _ = tokio::time::sleep(sleep_time) => {
+                debug!("timeout has been reached");
+            }
         }
 
         Ok(())

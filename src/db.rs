@@ -11,7 +11,7 @@ use std::{
 };
 use tokio::task::JoinHandle;
 use tokio_postgres::{Client, Row};
-use tracing::{debug, error};
+use tracing::{debug, error, instrument};
 
 const DB_APP_NAME: &str = env!("CARGO_PKG_NAME");
 const DB_APP_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -140,6 +140,7 @@ impl PostgresSslCertificates {
 }
 
 impl PostgresConnection {
+    #[instrument("NewDbConnection", skip_all)]
     pub async fn new(
         db_connection_string: PostgresConnectionString,
         sslmode: PostgresSslMode,
@@ -148,7 +149,7 @@ impl PostgresConnection {
         max_backoff_interval: Duration,
         shutdown_channel: ShutdownReceiver,
     ) -> Result<Self, PsqlExporterError> {
-        debug!("PostgresConnection::new: construct new postgres connection");
+        debug!("create new");
 
         let mut backoff_interval = default_backoff_interval;
         let mut sleeper = SleepHelper::from(shutdown_channel.clone());
@@ -161,9 +162,9 @@ impl PostgresConnection {
             match connection {
                 Ok((client, connection)) => {
                     let connection_handler = tokio::spawn(async move {
-                        debug!("PostgresConnection::new: spawn new connection task");
+                        debug!("spawn new connection task");
                         if let Err(e) = connection.await {
-                            error!("PostgresConnection: connection closed with error: {}", e);
+                            error!(error = %e);
                         }
                     });
 
@@ -179,7 +180,7 @@ impl PostgresConnection {
                     });
                 }
                 Err(e) => {
-                    error!("PostgresConnection::new: client error: {e}");
+                    error!(error = %e);
                 }
             };
 
@@ -191,6 +192,7 @@ impl PostgresConnection {
         }
     }
 
+    #[instrument("BuildTlsConnector", skip_all, fields(sslmode))]
     fn build_tls_connector(
         sslmode: &PostgresSslMode,
         certificates: &PostgresSslCertificates,
@@ -211,11 +213,7 @@ impl PostgresConnection {
                             openssl_sys::X509_V_ERR_HOSTNAME_MISMATCH,
                             openssl_sys::X509_V_ERR_EMAIL_MISMATCH,
                         ];
-                        debug!(
-                            "verify_callback, indicator={}, x509_result={}",
-                            verify_indicator,
-                            x509_result.error()
-                        );
+                        debug!(indicator = %verify_indicator, x509_result = %x509_result.error(), "tls_verify_callback");
 
                         if !verify_indicator
                             && allowed_errors.contains(&x509_result.error().as_raw())
@@ -231,7 +229,7 @@ impl PostgresConnection {
         };
 
         if let Some(rootcert) = certificates.rootcert.as_ref() {
-            debug!("loading CA bundle from {}", rootcert);
+            debug!(%rootcert, "loading CA bundle");
             connector.set_ca_file(rootcert).map_err(|e| {
                 PsqlExporterError::PostgresTlsRootCertificate {
                     rootcert: (*rootcert).clone(),
@@ -242,7 +240,7 @@ impl PostgresConnection {
 
         if certificates.has_client_cert() {
             if let Some(cert) = certificates.cert.as_ref() {
-                debug!("loading client certificate from {}", cert);
+                debug!(%cert, "loading client certificate");
                 connector
                     .set_certificate_file(cert, SslFiletype::PEM)
                     .map_err(|e| PsqlExporterError::PostgresTlsClientCertificate {
@@ -252,7 +250,7 @@ impl PostgresConnection {
             }
 
             if let Some(key) = certificates.key.as_ref() {
-                debug!("loading client private key from {}", key);
+                debug!(%key, "loading client private key");
                 connector
                     .set_private_key_file(key, SslFiletype::PEM)
                     .map_err(|e| PsqlExporterError::PostgresTlsClientCertificate {
@@ -266,12 +264,13 @@ impl PostgresConnection {
         Ok(connector)
     }
 
+    #[instrument("DbQuery", skip_all)]
     pub async fn query(
         &mut self,
         query: &str,
         query_timeout: Duration,
     ) -> Result<Vec<Row>, PsqlExporterError> {
-        debug!("PostgresConnection::query: {query:?}");
+        debug!(%query);
 
         let mut backoff_interval = self.default_backoff_interval;
         let mut sleeper = SleepHelper::from(self.shutdown_channel.clone());
@@ -281,9 +280,8 @@ impl PostgresConnection {
             let set_timeout_query = format!("set statement_timeout={};", query_timeout.as_millis());
             let result = self.client.query(set_timeout_query.as_str(), &[]).await;
             if let Err(e) = result {
-                error!("PostgresConnection::query: {e}");
+                error!(error = %e);
                 if e.code().is_none() {
-                    debug!("PostgresConnection::query: try to reconnect after error");
                     self.reconnect().await?;
                 } else {
                     return Err(PsqlExporterError::PostgresQuery {
@@ -295,9 +293,8 @@ impl PostgresConnection {
                 // Execute actual query
                 let result = self.client.query(query, &[]).await;
                 if let Err(e) = result {
-                    error!("PostgresConnection::query: {e}");
+                    error!(error = %e);
                     if e.code().is_none() {
-                        debug!("PostgresConnection::query: try to reconnect after error");
                         self.reconnect().await?;
                     } else {
                         return Err(PsqlExporterError::PostgresQuery {
@@ -318,8 +315,9 @@ impl PostgresConnection {
         }
     }
 
+    #[instrument("DbReconnect", skip_all)]
     async fn reconnect(&mut self) -> Result<&Self, PsqlExporterError> {
-        debug!("PostgresConnection::reconnect: try to reconnect");
+        debug!("try to reconnect");
         let new_connection = PostgresConnection::new(
             self.db_connection_string.clone(),
             self.sslmode.clone(),
@@ -337,7 +335,7 @@ impl PostgresConnection {
                 Ok(self)
             }
             Err(e) => {
-                error!("PostgresConnection::reconnect: can't reconnect: {e}");
+                error!(error = %e);
                 Err(e)
             }
         }

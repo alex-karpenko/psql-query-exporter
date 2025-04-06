@@ -16,7 +16,7 @@ use utils::SignalHandler;
 const HOME_PAGE_CONTENT: &str = include_str!("../assets/index.html");
 
 #[tokio::main]
-#[instrument]
+#[instrument("Main")]
 async fn main() -> Result<(), Box<dyn Error>> {
     let app_config = AppConfig::new();
     let scrape_config = ScrapeConfig::from(&app_config.config)?;

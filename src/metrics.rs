@@ -12,7 +12,7 @@ use prometheus::{
 use std::time::{Duration, SystemTime};
 use tokio::sync::mpsc;
 use tokio_postgres::Row;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 #[derive(Debug)]
 pub enum MetricWithType {
@@ -184,9 +184,10 @@ impl QueryMetrics {
     }
 }
 
+#[instrument("ComposeReply")]
 pub async fn compose_reply() -> String {
     let registry = prometheus::default_registry();
-    debug!("compose_reply: preparing metrics, registry={registry:?}");
+    debug!(?registry, "preparing metrics");
 
     let mut buffer = vec![];
     let encoder = TextEncoder::new();
@@ -198,11 +199,13 @@ pub async fn compose_reply() -> String {
     String::from_utf8(buffer).unwrap_or_else(|e| panic!("looks like a BUG: {e}"))
 }
 
+#[instrument("CollectorTask", skip_all)]
 pub async fn collecting_task(
     scrape_config: ScrapeConfig,
     shutdown_channel: ShutdownReceiver,
 ) -> Result<(), PsqlExporterError> {
-    debug!("collecting_task: config={scrape_config:?}");
+    debug!(config = ?scrape_config);
+
     let mut handler_index: usize = 0;
     let (tx, mut rx) = mpsc::channel(scrape_config.len());
     let sources = scrape_config.sources;
@@ -221,11 +224,11 @@ pub async fn collecting_task(
                 if let Err(result) = handler_result {
                     match result {
                         PsqlExporterError::ShutdownSignalReceived => {
-                            debug!("collect db task #{handler_index} completed by shutdown signal");
+                            debug!(task = %handler_index, "completed due to shutdown signal");
                             Ok(())
                         }
                         _ => {
-                            error!("collect db task completed unexpectedly: {result}");
+                            error!(task = %handler_index, error=%result, "completed unexpectedly");
                             Err(result)
                         }
                     }
@@ -239,13 +242,13 @@ pub async fn collecting_task(
         }
     }
 
-    debug!("collecting_task: {handler_index} handlers have been started");
+    debug!(task = %handler_index, "handlers have been started");
 
     while let Some(task_index) = rx.recv().await {
-        debug!("collecting_task: collecting_task_handler #{task_index} has been completed");
+        debug!(task = %task_index, "completed");
         handler_index -= 1;
         if handler_index == 0 {
-            info!("collecting_task: all tasks have been stopped, exiting");
+            info!("all tasks have been stopped, exiting");
             return Ok(());
         }
     }
@@ -253,15 +256,16 @@ pub async fn collecting_task(
     Ok(())
 }
 
+#[instrument("CollectSingleDbInstance", skip_all, fields(%database))]
 async fn collect_one_db_instance(
     database: ScrapeConfigDatabase,
     shutdown_channel: ShutdownReceiver,
 ) -> Result<(), PsqlExporterError> {
     if database.queries.is_empty() {
-        warn!("collect_one_db_instance: no queries for {database:?}, exiting");
+        warn!("no queries configured, exiting");
         return Ok(());
     }
-    debug!("collect_one_db_instance: start task for {database:?}");
+    debug!("start task");
 
     let certificates =
         PostgresSslCertificates::from(database.sslrootcert, database.sslcert, database.sslkey)?;
@@ -361,7 +365,7 @@ async fn collect_one_db_instance(
                         let expiration_time =
                             query_metrics[index].last_updated + query_item.metric_expiration_time;
                         if SystemTime::now() > expiration_time {
-                            debug!("deregister metrics as expired");
+                            debug!("deregister expired metrics");
                             query_metrics[index].unregister(registry);
                         }
                     }
@@ -388,22 +392,22 @@ async fn collect_one_db_instance(
 
             let slip_duration = SystemTime::now().duration_since(next_query_time).unwrap();
             let slip_duration = slip_duration.human_duration();
-            warn!(
-                "query loop of DB '{}' lasts too long for {}",
-                database.dbname, slip_duration
-            );
+            warn!(sleep = %slip_duration, "overtimed query loop");
         }
 
         sleeper.sleep(sleep_time).await?;
     }
 }
 
+#[instrument("UpdateMetrics", skip_all)]
 fn update_metrics(
     rows: &[Row],
     field: Option<&str>,
     var_labels: &Option<Vec<String>>,
     metric: &MetricWithType,
 ) -> Result<(), PsqlExporterError> {
+    debug!(?rows, ?field, ?var_labels, ?metric);
+
     match metric {
         MetricWithType::SingleInt(metric) => {
             if let Some(field) = field {
