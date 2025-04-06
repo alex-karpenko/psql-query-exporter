@@ -2,6 +2,7 @@ use crate::{
     db::{PostgresConnectionString, PostgresSslMode},
     errors::PsqlExporterError,
 };
+use core::fmt::Display;
 use regex::Regex;
 use serde::Deserialize;
 use std::{collections::HashMap, env, fs::read_to_string, time::Duration};
@@ -399,6 +400,19 @@ impl ScrapeConfigDatabase {
         self.queries.iter_mut().for_each(|q| {
             q.propagate_defaults(&defaults);
         });
+    }
+}
+
+impl Display for ScrapeConfigDatabase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "host: {}, port: {}, user: {}, dbname: {}",
+            self.connection_string.host,
+            self.connection_string.port,
+            self.connection_string.user,
+            self.connection_string.dbname
+        )
     }
 }
 
