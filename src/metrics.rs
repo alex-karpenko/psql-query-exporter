@@ -9,7 +9,6 @@ use prometheus::core::{AtomicF64, AtomicI64, Collector, GenericGauge, GenericGau
 use prometheus::{
     opts, Encoder, Gauge, GaugeVec, IntGauge, IntGaugeVec, Opts, Registry, TextEncoder,
 };
-use std::convert::Infallible;
 use std::time::{Duration, SystemTime};
 use tokio::sync::mpsc;
 use tokio_postgres::Row;
@@ -185,7 +184,7 @@ impl QueryMetrics {
     }
 }
 
-pub async fn compose_reply() -> Result<impl warp::Reply, Infallible> {
+pub async fn compose_reply() -> String {
     let registry = prometheus::default_registry();
     debug!("compose_reply: preparing metrics, registry={registry:?}");
 
@@ -196,7 +195,7 @@ pub async fn compose_reply() -> Result<impl warp::Reply, Infallible> {
         .encode(&metric_families, &mut buffer)
         .unwrap_or_else(|e| panic!("looks like a BUG: {e}"));
 
-    Ok(String::from_utf8(buffer).unwrap_or_else(|e| panic!("looks like a BUG: {e}")))
+    String::from_utf8(buffer).unwrap_or_else(|e| panic!("looks like a BUG: {e}"))
 }
 
 pub async fn collecting_task(
@@ -258,7 +257,12 @@ async fn collect_one_db_instance(
     database: ScrapeConfigDatabase,
     shutdown_channel: ShutdownReceiver,
 ) -> Result<(), PsqlExporterError> {
+    if database.queries.is_empty() {
+        warn!("collect_one_db_instance: no queries for {database:?}, exiting");
+        return Ok(());
+    }
     debug!("collect_one_db_instance: start task for {database:?}");
+
     let certificates =
         PostgresSslCertificates::from(database.sslrootcert, database.sslcert, database.sslkey)?;
     let mut db_connection = PostgresConnection::new(
