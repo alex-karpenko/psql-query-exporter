@@ -297,7 +297,7 @@ async fn collect_one_db_instance(
             match result {
                 Ok(result) => {
                     query_metrics[index].register(registry);
-                    match &query_item.values {
+                    let update_result = match &query_item.values {
                         ScrapeConfigValues::ValueFrom { single: value } => {
                             if let Some(field) = &value.field {
                                 update_metrics(
@@ -318,29 +318,42 @@ async fn collect_one_db_instance(
                         ScrapeConfigValues::ValuesWithLabels {
                             multi_labels: values,
                         } => {
+                            let mut r = Ok(());
                             for (value, metric) in values.iter().zip(&query_metrics[index].metrics)
                             {
-                                update_metrics(
+                                if let Err(e) = update_metrics(
                                     &result,
                                     Some(&value.field),
                                     &query_item.var_labels,
                                     metric,
-                                )
+                                ) {
+                                    r = Err(e);
+                                    break;
+                                }
                             }
+                            r
                         }
                         ScrapeConfigValues::ValuesWithSuffixes {
                             multi_suffixes: values,
                         } => {
+                            let mut r = Ok(());
                             for (value, metric) in values.iter().zip(&query_metrics[index].metrics)
                             {
-                                update_metrics(
+                                if let Err(e) = update_metrics(
                                     &result,
                                     Some(&value.field),
                                     &query_item.var_labels,
                                     metric,
-                                )
+                                ) {
+                                    r = Err(e);
+                                    break;
+                                }
                             }
+                            r
                         }
+                    };
+                    if let Err(e) = update_result {
+                        error!("{e}")
                     }
                 }
                 Err(e) => {
@@ -390,20 +403,20 @@ fn update_metrics(
     field: Option<&str>,
     var_labels: &Option<Vec<String>>,
     metric: &MetricWithType,
-) {
+) -> Result<(), PsqlExporterError> {
     match metric {
         MetricWithType::SingleInt(metric) => {
             if let Some(field) = field {
-                metric.set(rows[0].get(field))
+                metric.set(rows[0].try_get(field)?);
             } else {
-                metric.set(rows[0].get(0))
+                metric.set(rows[0].try_get(0)?);
             }
         }
         MetricWithType::SingleFloat(metric) => {
             if let Some(field) = field {
-                metric.set(rows[0].get(field))
+                metric.set(rows[0].try_get(field)?)
             } else {
-                metric.set(rows[0].get(0))
+                metric.set(rows[0].try_get(0)?)
             }
         }
         MetricWithType::VectorInt(metric) => {
@@ -411,14 +424,16 @@ fn update_metrics(
                 let mut new_labels: Vec<String> = vec![];
                 if let Some(labels) = var_labels {
                     for label in labels {
-                        new_labels.push(row.get(label.as_str()));
+                        new_labels.push(row.try_get(label.as_str())?);
                     }
                     let new_labels: Vec<&str> = new_labels.iter().map(AsRef::as_ref).collect();
                     let new_labels: &[&str] = new_labels.as_slice();
                     if let Some(field) = field {
-                        metric.with_label_values(new_labels).set(row.get(field));
+                        metric
+                            .with_label_values(new_labels)
+                            .set(row.try_get(field)?);
                     } else {
-                        metric.with_label_values(new_labels).set(row.get(0));
+                        metric.with_label_values(new_labels).set(row.try_get(0)?);
                     }
                 }
             }
@@ -428,17 +443,21 @@ fn update_metrics(
                 let mut new_labels: Vec<String> = vec![];
                 if let Some(labels) = var_labels {
                     for label in labels {
-                        new_labels.push(row.get(label.as_str()));
+                        new_labels.push(row.try_get(label.as_str())?);
                     }
                     let new_labels: Vec<&str> = new_labels.iter().map(AsRef::as_ref).collect();
                     let new_labels: &[&str] = new_labels.as_slice();
                     if let Some(field) = field {
-                        metric.with_label_values(new_labels).set(row.get(field));
+                        metric
+                            .with_label_values(new_labels)
+                            .set(row.try_get(field)?);
                     } else {
-                        metric.with_label_values(new_labels).set(row.get(0));
+                        metric.with_label_values(new_labels).set(row.try_get(0)?);
                     }
                 }
             }
         }
     }
+
+    Ok(())
 }
