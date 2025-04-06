@@ -1,8 +1,5 @@
 use crate::errors::PsqlExporterError;
-use std::{
-    error::Error,
-    time::{Duration, SystemTime},
-};
+use std::{error::Error, time::Duration};
 use tokio::{
     select,
     signal::unix::{signal, Signal, SignalKind},
@@ -11,8 +8,6 @@ use tokio::{
 use tracing::{debug, error, info};
 pub type ShutdownReceiver = watch::Receiver<bool>;
 pub type ShutdownSender = watch::Sender<bool>;
-
-const MAX_LOOP_SLEEP_TIME: Duration = Duration::from_secs(5);
 
 #[derive(Debug)]
 pub struct SignalHandler {
@@ -77,42 +72,14 @@ impl SleepHelper {
     }
 
     pub async fn sleep(&mut self, sleep_time: Duration) -> Result<(), PsqlExporterError> {
-        let finish_time = SystemTime::now() + sleep_time;
-        let mut rest_sleep_time = sleep_time;
-
-        while rest_sleep_time > Duration::from_micros(0) {
-            if self.is_shutdown_state() {
+        select! {
+            _ = self.shutdown_channel.changed() => {
+                debug!("sleep: shutdown signal has been received");
                 return Err(PsqlExporterError::ShutdownSignalReceived);
-            }
-
-            let loop_sleep_time = if rest_sleep_time > MAX_LOOP_SLEEP_TIME {
-                MAX_LOOP_SLEEP_TIME
-            } else {
-                rest_sleep_time
-            };
-
-            tokio::time::sleep(loop_sleep_time).await;
-            rest_sleep_time = finish_time
-                .duration_since(SystemTime::now())
-                .unwrap_or(Duration::from_micros(0));
+            },
+            _ = tokio::time::sleep(sleep_time) => {}
         }
 
-        if !self.is_shutdown_state() {
-            Ok(())
-        } else {
-            Err(PsqlExporterError::ShutdownSignalReceived)
-        }
-    }
-
-    fn is_shutdown_state(&mut self) -> bool {
-        if self.shutdown_channel.has_changed().unwrap_or(true) {
-            let msg = self.shutdown_channel.borrow_and_update();
-            if *msg {
-                debug!("is_shutdown_state: shutdown signal has been received");
-                return true;
-            }
-        }
-
-        false
+        Ok(())
     }
 }
