@@ -2,6 +2,13 @@ name: Security audit
 on:
   schedule:
     - cron: "17 5 * * 5"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - deny.toml
   push:
     branches:
       - main
