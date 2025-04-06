@@ -224,7 +224,7 @@ pub async fn collecting_task(
                 if let Err(result) = handler_result {
                     match result {
                         PsqlExporterError::ShutdownSignalReceived => {
-                            debug!(task = %handler_index, "comleted due to shutdown signal");
+                            debug!(task = %handler_index, "completed due to shutdown signal");
                             Ok(())
                         }
                         _ => {
