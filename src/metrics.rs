@@ -257,7 +257,12 @@ async fn collect_one_db_instance(
     database: ScrapeConfigDatabase,
     shutdown_channel: ShutdownReceiver,
 ) -> Result<(), PsqlExporterError> {
+    if database.queries.is_empty() {
+        warn!("collect_one_db_instance: no queries for {database:?}, exiting");
+        return Ok(());
+    }
     debug!("collect_one_db_instance: start task for {database:?}");
+
     let certificates =
         PostgresSslCertificates::from(database.sslrootcert, database.sslcert, database.sslkey)?;
     let mut db_connection = PostgresConnection::new(
