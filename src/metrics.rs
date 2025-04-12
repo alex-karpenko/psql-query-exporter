@@ -196,6 +196,11 @@ pub async fn compose_reply() -> String {
         .encode(&metric_families, &mut buffer)
         .unwrap_or_else(|e| panic!("looks like a BUG: {e}"));
 
+    if buffer.is_empty() {
+        warn!("no metrics found");
+        return String::from("# no metrics found\n");
+    }
+
     String::from_utf8(buffer).unwrap_or_else(|e| panic!("looks like a BUG: {e}"))
 }
 
@@ -206,50 +211,58 @@ pub async fn collecting_task(
 ) -> Result<(), PsqlExporterError> {
     debug!(config = ?scrape_config);
 
-    let mut handler_index: usize = 0;
-    let (tx, mut rx) = mpsc::channel(scrape_config.len());
-    let sources = scrape_config.sources;
-    for (_, source_db_instance) in sources {
-        let databases = source_db_instance.databases;
-        for database in databases {
-            let tx = tx.clone();
-            let shut_rx = shutdown_channel.clone();
-            tokio::spawn(async move {
-                let handler_result = collect_one_db_instance(database, shut_rx).await;
-                let send_result = tx
-                    .send(handler_index)
-                    .await
-                    .map_err(PsqlExporterError::MetricsBackStatusSend);
+    if scrape_config.len() == 0 {
+        warn!("no sources configured, waiting for shutdown signal");
+        let mut rx = shutdown_channel.clone();
+        rx.changed()
+            .await
+            .map_err(|_| PsqlExporterError::ShutdownSignalReceived)?;
+    } else {
+        let mut handler_index: usize = 0;
+        let (tx, mut rx) = mpsc::channel(scrape_config.len());
+        let sources = scrape_config.sources;
+        for (_, source_db_instance) in sources {
+            let databases = source_db_instance.databases;
+            for database in databases {
+                let tx = tx.clone();
+                let shut_rx = shutdown_channel.clone();
+                tokio::spawn(async move {
+                    let handler_result = collect_one_db_instance(database, shut_rx).await;
+                    let send_result = tx
+                        .send(handler_index)
+                        .await
+                        .map_err(PsqlExporterError::MetricsBackStatusSend);
 
-                if let Err(result) = handler_result {
-                    match result {
-                        PsqlExporterError::ShutdownSignalReceived => {
-                            debug!(task = %handler_index, "completed due to shutdown signal");
-                            Ok(())
+                    if let Err(result) = handler_result {
+                        match result {
+                            PsqlExporterError::ShutdownSignalReceived => {
+                                debug!(task = %handler_index, "completed due to shutdown signal");
+                                Ok(())
+                            }
+                            _ => {
+                                error!(task = %handler_index, error=%result, "completed unexpectedly");
+                                Err(result)
+                            }
                         }
-                        _ => {
-                            error!(task = %handler_index, error=%result, "completed unexpectedly");
-                            Err(result)
-                        }
+                    } else if let Err(result) = send_result {
+                        Err(result)
+                    } else {
+                        handler_result
                     }
-                } else if let Err(result) = send_result {
-                    Err(result)
-                } else {
-                    handler_result
-                }
-            });
-            handler_index += 1;
+                });
+                handler_index += 1;
+            }
         }
-    }
 
-    debug!(task = %handler_index, "handlers have been started");
+        debug!(task = %handler_index, "handlers have been started");
 
-    while let Some(task_index) = rx.recv().await {
-        debug!(task = %task_index, "completed");
-        handler_index -= 1;
-        if handler_index == 0 {
-            info!("all tasks have been stopped, exiting");
-            return Ok(());
+        while let Some(task_index) = rx.recv().await {
+            debug!(task = %task_index, "completed");
+            handler_index -= 1;
+            if handler_index == 0 {
+                info!("all tasks have been stopped, exiting");
+                return Ok(());
+            }
         }
     }
 

@@ -26,15 +26,35 @@ pub struct PostgresConnectionString {
     pub sslmode: PostgresSslMode,
 }
 
+impl PostgresConnectionString {
+    fn format(&self, hide_password: bool) -> String {
+        let password = if hide_password {
+            "***".to_string()
+        } else {
+            self.password.clone()
+        };
+
+        format!(
+            "host={host} port={port} dbname={dbname} user={user} password='{password}' sslmode={sslmode} application_name={DB_APP_NAME}-v{DB_APP_VERSION}",
+            host=self.host,
+            port=self.port,
+            user=self.user,
+            password=password,
+            sslmode=self.sslmode,
+            dbname=self.dbname
+        )
+    }
+}
+
 impl Display for PostgresConnectionString {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "host={host} port={port} dbname={dbname} user={user} password='***' sslmode={sslmode} application_name={DB_APP_NAME}-v{DB_APP_VERSION}", host=self.host, port=self.port, user=self.user, sslmode=self.sslmode, dbname=self.dbname)
+        write!(f, "{}", self.format(true))
     }
 }
 
 impl Debug for PostgresConnectionString {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "host={host} port={port} dbname={dbname} user={user} password='***' sslmode={sslmode} application_name={DB_APP_NAME}-v{DB_APP_VERSION}", host=self.host, port=self.port, user=self.user, sslmode=self.sslmode, dbname=self.dbname)
+        write!(f, "{}", self.format(true))
     }
 }
 
@@ -53,7 +73,7 @@ impl Default for PostgresConnectionString {
 
 impl PostgresConnectionString {
     fn get_conn_string(&self) -> String {
-        format!("host={host} port={port} dbname={dbname} user={user} password='{password}' sslmode={sslmode} application_name={DB_APP_NAME}-v{DB_APP_VERSION}", host=self.host, port=self.port, user=self.user, password=self.password, sslmode=self.sslmode, dbname=self.dbname)
+        self.format(false)
     }
 }
 #[derive(Debug)]
@@ -270,7 +290,7 @@ impl PostgresConnection {
         query: &str,
         query_timeout: Duration,
     ) -> Result<Vec<Row>, PsqlExporterError> {
-        debug!(%query);
+        debug!(%query, timeout = ?query_timeout);
 
         let mut backoff_interval = self.default_backoff_interval;
         let mut sleeper = SleepHelper::from(self.shutdown_channel.clone());

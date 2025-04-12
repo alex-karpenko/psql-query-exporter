@@ -46,11 +46,11 @@ impl SignalHandler {
         info!(%signal,  "shutting down");
         if let Err(e) = self.shutdown_channel_tx.send(true) {
             error!(error = %e, "can't send shutdown message");
-        };
-
-        debug!("shutdown message has been sent, waiting until all task stopped");
-        self.shutdown_channel_tx.closed().await;
-        info!("shutdown completed");
+        } else {
+            debug!("shutdown message has been sent, waiting until all task stopped");
+            self.shutdown_channel_tx.closed().await;
+            info!("shutdown completed");
+        }
     }
 
     async fn wait_for_signal(&mut self) -> &str {

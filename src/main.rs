@@ -8,7 +8,7 @@ mod utils;
 use app_config::AppConfig;
 use axum::{response::Html, routing::get, Router};
 use scrape_config::ScrapeConfig;
-use std::error::Error;
+use std::{error::Error, net::SocketAddr};
 use tokio::net::TcpListener;
 use tracing::{info, instrument};
 use utils::SignalHandler;
@@ -20,7 +20,12 @@ const HOME_PAGE_CONTENT: &str = include_str!("../assets/index.html");
 async fn main() -> Result<(), Box<dyn Error>> {
     let app_config = AppConfig::new();
     let scrape_config = ScrapeConfig::from(&app_config.config)?;
+    let addr = std::net::SocketAddr::from((app_config.listen_on, app_config.port));
 
+    run(scrape_config, addr).await
+}
+
+async fn run(scrape_config: ScrapeConfig, addr: SocketAddr) -> Result<(), Box<dyn Error>> {
     let app = Router::new()
         .route("/", get(Html(HOME_PAGE_CONTENT)))
         .route("/health", get("healthy\n"))
@@ -29,7 +34,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut signal_handler = SignalHandler::new()?;
     let shutdown_channel_rx = signal_handler.get_rx_channel();
 
-    let addr = std::net::SocketAddr::from((app_config.listen_on, app_config.port));
     let listener = TcpListener::bind(&addr)
         .await
         .unwrap_or_else(|_| panic!("unable to bind to address {:?}", addr));
