@@ -3,7 +3,6 @@ use crate::{
     errors::PsqlExporterError,
 };
 use core::fmt::Display;
-use regex::Regex;
 use serde::Deserialize;
 use std::{collections::HashMap, env, fs::read_to_string, time::Duration};
 
@@ -203,14 +202,15 @@ impl Default for ScrapeConfigDefaults {
 
 impl ScrapeConfigDefaults {
     fn merge_env_vars(&mut self) -> Result<(), PsqlExporterError> {
+        let envs = hashmap_from_envs();
         if let Some(rootcert) = self.sslrootcert.clone() {
-            self.sslrootcert = Some(apply_envs_to_string(&rootcert)?);
+            self.sslrootcert = Some(substitute_envs(&rootcert, &envs)?);
         }
         if let Some(cert) = self.sslcert.clone() {
-            self.sslcert = Some(apply_envs_to_string(&cert)?);
+            self.sslcert = Some(substitute_envs(&cert, &envs)?);
         }
         if let Some(key) = self.sslkey.clone() {
-            self.sslkey = Some(apply_envs_to_string(&key)?);
+            self.sslkey = Some(substitute_envs(&key, &envs)?);
         }
 
         Ok(())
@@ -305,17 +305,18 @@ impl ScrapeConfigSource {
     }
 
     fn merge_env_vars(&mut self) -> Result<(), PsqlExporterError> {
-        self.host = apply_envs_to_string(&self.host)?;
-        self.user = apply_envs_to_string(&self.user)?;
-        self.password = apply_envs_to_string(&self.password)?;
+        let envs = hashmap_from_envs();
+        self.host = substitute_envs(&self.host, &envs)?;
+        self.user = substitute_envs(&self.user, &envs)?;
+        self.password = substitute_envs(&self.password, &envs)?;
         if let Some(rootcert) = self.sslrootcert.clone() {
-            self.sslrootcert = Some(apply_envs_to_string(&rootcert)?);
+            self.sslrootcert = Some(substitute_envs(&rootcert, &envs)?);
         }
         if let Some(cert) = self.sslcert.clone() {
-            self.sslcert = Some(apply_envs_to_string(&cert)?);
+            self.sslcert = Some(substitute_envs(&cert, &envs)?);
         }
         if let Some(key) = self.sslkey.clone() {
-            self.sslkey = Some(apply_envs_to_string(&key)?);
+            self.sslkey = Some(substitute_envs(&key, &envs)?);
         }
 
         Ok(())
@@ -459,20 +460,65 @@ impl Default for ScrapeConfigValues {
     }
 }
 
-fn apply_envs_to_string(text: &str) -> Result<String, PsqlExporterError> {
-    let re = Regex::new(r"\$\{[a-zA-Z][A-Za-z0-9_]*\}")
-        .unwrap_or_else(|e| panic!("looks like a BUG: {e}"));
-    let mut result = text.to_owned();
-    for item in re.captures_iter(text) {
-        let env_name = item.get(0).expect("looks like a BUG").as_str().to_string();
-        let env_name = env_name.trim_start_matches("${").trim_end_matches('}');
-        let env_value =
-            env::var(env_name).map_err(|e| PsqlExporterError::EnvironmentVariableSubstitution {
-                variable: env_name.to_string(),
-                cause: e,
-            })?;
-        result = re.replace_all(&result, env_value).to_string();
+fn hashmap_from_envs() -> HashMap<String, String> {
+    env::vars().into_iter().collect()
+}
+
+fn substitute_envs(
+    input: &str,
+    envs: &HashMap<String, String>,
+) -> Result<String, PsqlExporterError> {
+    if envsubst::is_templated(input) {
+        let result = envsubst::substitute(input, envs)?;
+        // If there variable is still present - error
+        if envsubst::is_templated(&result) {
+            return Err(PsqlExporterError::UndefinedEnvironmentVariables(
+                input.into(),
+            ));
+        }
+        Ok(result)
+    } else {
+        Ok(input.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_substitute_envs() {
+        env::set_var("POSTGRES_USER", "postgres");
+        env::set_var("POSTGRES_PASSWORD", "password");
+        env::set_var("POSTGRES_HOST", "localhost");
+        env::set_var("POSTGRES_PORT", "5432");
+        env::set_var("POSTGRES_DB", "psql_exporter");
+
+        let envs = hashmap_from_envs();
+
+        let text = "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}";
+        let result = substitute_envs(text, &envs).unwrap();
+        assert_eq!(
+            result,
+            "postgres://postgres:password@localhost:5432/psql_exporter"
+        );
     }
 
-    Ok(result)
+    #[test]
+    fn test_substitute_envs_error() {
+        let envs = hashmap_from_envs();
+
+        let text = "postgres://${POSTGRES_USER2}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}";
+        let result = substitute_envs(text, &envs);
+        assert!(
+            result.is_err(),
+            "Expected error, but got result: {:?}",
+            result
+        );
+
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            format!("some environment variable(s) not defined: {text}")
+        )
+    }
 }
