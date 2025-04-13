@@ -49,7 +49,7 @@ impl SignalHandler {
         } else {
             debug!("shutdown message has been sent, waiting until all task stopped");
             self.shutdown_channel_tx.closed().await;
-            info!("shutdown completed");
+            debug!("shutdown completed");
         }
     }
 

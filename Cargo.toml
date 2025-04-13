@@ -8,9 +8,6 @@ repository = "https://github.com/alex-karpenko/psql-query-exporter"
 license = "MIT OR Apache-2.0"
 keywords = ["postgres", "postgresql", "prometheus", "exporter"]
 
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 axum = { version = "0.8.3", default-features = false, features = ["tokio", "http1"] }
 clap = { version = "4.5.36", features = ["derive"] }
@@ -28,3 +25,8 @@ tokio = { version = "1.43.0", features = ["full"] }
 tokio-postgres = "0.7.12"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter", "json"] }
+
+[dev-dependencies]
+insta = "1.42.2"
+reqwest = { version = "0.12.15", default-features = false }
+rstest = "0.25.0"
