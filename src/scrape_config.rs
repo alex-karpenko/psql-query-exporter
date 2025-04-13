@@ -460,8 +460,9 @@ impl Default for ScrapeConfigValues {
     }
 }
 
+#[inline]
 fn hashmap_from_envs() -> HashMap<String, String> {
-    env::vars().into_iter().collect()
+    env::vars().collect()
 }
 
 fn substitute_envs(
