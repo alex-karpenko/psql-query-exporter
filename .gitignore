@@ -3,6 +3,7 @@
 /values-test.yaml
 /config-dev.yaml
 /config-local.yaml
+/config-empty.yaml
 .vscode
 /tests/
 /*.pem

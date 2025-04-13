@@ -1,4 +1,4 @@
-use std::{env, io};
+use std::io;
 use thiserror::Error;
 
 #[derive(Error)]
@@ -10,11 +10,10 @@ pub enum PsqlExporterError {
         #[from]
         cause: serde_yaml_ng::Error,
     },
-    #[error("unable to substitute environment variable '{}': {}", .variable, .cause)]
-    EnvironmentVariableSubstitution {
-        variable: String,
-        cause: env::VarError,
-    },
+    #[error("some environment variable(s) not defined: {0}")]
+    UndefinedEnvironmentVariables(String),
+    #[error("unable to substitute environment variables: {0}")]
+    EnvironmentVariableSubstitution(#[from] envsubst::Error),
     #[error("query failed '{}': {}", .query, .cause)]
     PostgresQuery {
         query: String,
