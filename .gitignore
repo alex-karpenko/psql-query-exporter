@@ -5,7 +5,8 @@
 /config-local.yaml
 /config-empty.yaml
 .vscode
-/tests/
 /*.pem
 /.idea
 .DS_Store
+
+docker_tests/

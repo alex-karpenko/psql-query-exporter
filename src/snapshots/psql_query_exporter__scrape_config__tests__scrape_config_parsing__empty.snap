@@ -1,0 +1,19 @@
+---
+source: src/scrape_config.rs
+description: "config file: empty"
+---
+ScrapeConfig {
+    defaults: ScrapeConfigDefaults {
+        scrape_interval: 1800s,
+        query_timeout: 10s,
+        backoff_interval: 10s,
+        max_backoff_interval: 300s,
+        metric_expiration_time: 0ns,
+        metric_prefix: None,
+        sslrootcert: None,
+        sslcert: None,
+        sslkey: None,
+        sslmode: Prefer,
+    },
+    sources: {},
+}

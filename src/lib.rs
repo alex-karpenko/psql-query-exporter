@@ -61,7 +61,7 @@ async fn web_server(
 }
 
 #[cfg(test)]
-pub mod test_lib {
+pub mod test_utils {
     use std::{
         net::SocketAddr,
         sync::atomic::{AtomicU16, Ordering},
@@ -86,7 +86,7 @@ pub mod test_lib {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_lib::{init_tracing, next_addr};
+    use crate::test_utils::{init_tracing, next_addr};
     use rstest::rstest;
     use std::time::Duration;
     use tokio::sync::watch;

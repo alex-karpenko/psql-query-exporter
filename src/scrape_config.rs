@@ -162,9 +162,9 @@ pub enum FieldType {
 }
 
 impl ScrapeConfig {
-    pub fn from(filename: &String) -> Result<ScrapeConfig, PsqlExporterError> {
-        let config = read_to_string(filename).map_err(|e| PsqlExporterError::LoadConfigFile {
-            filename: filename.clone(),
+    pub fn from_file(path: &String) -> Result<ScrapeConfig, PsqlExporterError> {
+        let config = read_to_string(path).map_err(|e| PsqlExporterError::LoadConfigFile {
+            filename: path.clone(),
             cause: e,
         })?;
         let mut config: ScrapeConfig = serde_yaml_ng::from_str(&config)?;
@@ -490,6 +490,9 @@ fn substitute_envs(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use insta::assert_debug_snapshot;
+    use insta::with_settings;
+    use rstest::rstest;
 
     #[test]
     fn test_substitute_envs() {
@@ -525,5 +528,16 @@ mod tests {
             result.unwrap_err().to_string(),
             format!("some environment variable(s) not defined: {text}")
         )
+    }
+
+    #[rstest]
+    #[case("empty")]
+    #[case("override_defaults")]
+    fn test_scrape_config_parsing(#[case] name: &str) {
+        let config = ScrapeConfig::from_file(&format!("tests/configs/{name}.yaml")).unwrap();
+        with_settings!(
+            { description => format!("config file: {name}"), omit_expression => true },
+            { assert_debug_snapshot!(format!("scrape_config_parsing__{name}"), config) }
+        );
     }
 }

@@ -8,7 +8,7 @@ use tracing::instrument;
 #[instrument("Main")]
 async fn main() -> Result<(), Box<dyn Error>> {
     let app_config = AppConfig::new();
-    let scrape_config = ScrapeConfig::from(&app_config.config)?;
+    let scrape_config = ScrapeConfig::from_file(&app_config.config)?;
     let addr = SocketAddr::from((app_config.listen_on, app_config.port));
     let signal_handler = SignalHandler::new()?;
 
