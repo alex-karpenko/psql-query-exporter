@@ -181,6 +181,10 @@ impl ScrapeConfig {
     pub fn len(&self) -> usize {
         self.sources.len()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.sources.is_empty()
+    }
 }
 
 impl Default for ScrapeConfigDefaults {

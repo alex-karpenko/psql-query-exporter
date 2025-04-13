@@ -25,6 +25,7 @@ pub struct AppConfig {
 }
 
 impl AppConfig {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> AppConfig {
         let config: AppConfig = Parser::parse();
 

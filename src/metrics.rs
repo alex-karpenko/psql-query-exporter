@@ -204,14 +204,14 @@ pub async fn compose_reply() -> String {
     String::from_utf8(buffer).unwrap_or_else(|e| panic!("looks like a BUG: {e}"))
 }
 
-#[instrument("CollectorTask", skip_all)]
-pub async fn collecting_task(
+#[instrument("CollectorsTask", skip_all)]
+pub async fn collectors_task(
     scrape_config: ScrapeConfig,
     shutdown_channel: ShutdownReceiver,
 ) -> Result<(), PsqlExporterError> {
     debug!(config = ?scrape_config);
 
-    if scrape_config.len() == 0 {
+    if scrape_config.is_empty() {
         warn!("no sources configured, waiting for shutdown signal");
         let mut rx = shutdown_channel.clone();
         rx.changed()
