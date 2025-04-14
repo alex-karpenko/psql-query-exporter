@@ -7,6 +7,7 @@ pub mod utils;
 
 use axum::{response::Html, routing::get, Router};
 use metrics::collectors_task;
+use prometheus::Registry;
 use scrape_config::ScrapeConfig;
 use std::{error::Error, net::SocketAddr};
 use tokio::net::TcpListener;
@@ -19,16 +20,19 @@ const HOME_PAGE_CONTENT: &str = include_str!("../assets/index.html");
 pub async fn run_exporter(
     scrape_config: ScrapeConfig,
     addr: SocketAddr,
+    registry: Registry,
     mut signal_handler: SignalHandler,
 ) -> Result<(), Box<dyn Error>> {
     info!("starting metrics collector task");
     let metrics_collector_task = tokio::task::spawn(collectors_task(
         scrape_config,
+        registry.clone(),
         signal_handler.get_rx_channel(),
     ));
 
     info!(address = %addr, "starting web server task");
-    let http_server_task = tokio::task::spawn(web_server(addr, signal_handler.get_rx_channel()));
+    let http_server_task =
+        tokio::task::spawn(web_server(addr, registry, signal_handler.get_rx_channel()));
 
     tokio::select! {
         biased;
@@ -43,12 +47,13 @@ pub async fn run_exporter(
 #[instrument("WebServer", skip_all, fields(addr))]
 async fn web_server(
     addr: SocketAddr,
+    registry: Registry,
     mut shutdown_rx: ShutdownReceiver,
 ) -> Result<(), std::io::Error> {
     let app = Router::new()
         .route("/", get(Html(HOME_PAGE_CONTENT)))
         .route("/health", get("healthy\n"))
-        .route("/metrics", get(metrics::compose_reply));
+        .route("/metrics", get(|| metrics::compose_reply(registry)));
 
     let listener = TcpListener::bind(&addr)
         .await
@@ -101,7 +106,8 @@ mod tests {
 
         let addr = next_addr();
         let (tx, rx) = watch::channel(false);
-        let server_task = tokio::spawn(web_server(addr, rx));
+        let registry = Registry::new();
+        let server_task = tokio::spawn(async move { web_server(addr, registry, rx).await });
         tokio::time::sleep(Duration::from_millis(1)).await;
 
         let client = reqwest::Client::new();

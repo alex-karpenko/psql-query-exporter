@@ -185,8 +185,7 @@ impl QueryMetrics {
 }
 
 #[instrument("ComposeReply")]
-pub async fn compose_reply() -> String {
-    let registry = prometheus::default_registry();
+pub async fn compose_reply(registry: Registry) -> String {
     debug!(?registry, "preparing metrics");
 
     let mut buffer = vec![];
@@ -207,6 +206,7 @@ pub async fn compose_reply() -> String {
 #[instrument("CollectorsTask", skip_all)]
 pub async fn collectors_task(
     scrape_config: ScrapeConfig,
+    registry: Registry,
     shutdown_channel: ShutdownReceiver,
 ) -> Result<(), PsqlExporterError> {
     debug!(config = ?scrape_config);
@@ -226,8 +226,9 @@ pub async fn collectors_task(
             for database in databases {
                 let tx = tx.clone();
                 let shut_rx = shutdown_channel.clone();
+                let registry = registry.clone();
                 tokio::spawn(async move {
-                    let handler_result = collect_one_db_instance(database, shut_rx).await;
+                    let handler_result = collect_one_db_instance(database, registry, shut_rx).await;
                     let send_result = tx
                         .send(handler_index)
                         .await
@@ -272,6 +273,7 @@ pub async fn collectors_task(
 #[instrument("CollectSingleDbInstance", skip_all, fields(%database))]
 async fn collect_one_db_instance(
     database: ScrapeConfigDatabase,
+    registry: Registry,
     shutdown_channel: ShutdownReceiver,
 ) -> Result<(), PsqlExporterError> {
     if database.queries.is_empty() {
@@ -292,7 +294,6 @@ async fn collect_one_db_instance(
     )
     .await?;
 
-    let registry = prometheus::default_registry();
     let mut query_metrics: Vec<QueryMetrics> = Vec::with_capacity(database.queries.len());
     let mut sleeper = SleepHelper::from(shutdown_channel.clone());
 
@@ -313,7 +314,7 @@ async fn collect_one_db_instance(
 
             match result {
                 Ok(result) => {
-                    query_metrics[index].register(registry);
+                    query_metrics[index].register(&registry);
                     let update_result = match &query_item.values {
                         ScrapeConfigValues::ValueFrom { single: value } => {
                             if let Some(field) = &value.field {
@@ -379,7 +380,7 @@ async fn collect_one_db_instance(
                             query_metrics[index].last_updated + query_item.metric_expiration_time;
                         if SystemTime::now() > expiration_time {
                             debug!("deregister expired metrics");
-                            query_metrics[index].unregister(registry);
+                            query_metrics[index].unregister(&registry);
                         }
                     }
                     error!("{e}")

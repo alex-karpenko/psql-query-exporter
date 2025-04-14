@@ -1,3 +1,4 @@
+use prometheus::Registry;
 use psql_query_exporter::{
     app_config::AppConfig, run_exporter, scrape_config::ScrapeConfig, utils::SignalHandler,
 };
@@ -11,6 +12,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let scrape_config = ScrapeConfig::from_file(&app_config.config)?;
     let addr = SocketAddr::from((app_config.listen_on, app_config.port));
     let signal_handler = SignalHandler::new()?;
+    let registry = Registry::new();
 
-    run_exporter(scrape_config, addr, signal_handler).await
+    run_exporter(scrape_config, addr, registry, signal_handler).await
 }
