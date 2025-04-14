@@ -1,5 +1,5 @@
 ---
-source: src/scrape_config.rs
+source: src/config.rs
 description: "config file: override_defaults"
 ---
 ScrapeConfig {

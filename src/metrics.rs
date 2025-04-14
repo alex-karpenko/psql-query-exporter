@@ -1,8 +1,8 @@
-use crate::db::{PostgresConnection, PostgresSslCertificates};
-use crate::errors::PsqlExporterError;
-use crate::scrape_config::{
+use crate::config::{
     FieldType, ScrapeConfig, ScrapeConfigDatabase, ScrapeConfigQuery, ScrapeConfigValues,
 };
+use crate::db::{PostgresConnection, PostgresSslCertificates};
+use crate::errors::PsqlExporterError;
 use crate::utils::{ShutdownReceiver, SleepHelper};
 use human_repr::HumanDuration;
 use prometheus::core::{AtomicF64, AtomicI64, Collector, GenericGauge, GenericGaugeVec};

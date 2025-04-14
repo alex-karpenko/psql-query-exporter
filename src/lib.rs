@@ -1,14 +1,17 @@
-pub mod app_config;
+pub mod cli;
+pub mod config;
 pub mod db;
 pub mod errors;
 pub mod metrics;
-pub mod scrape_config;
 pub mod utils;
 
+#[cfg(test)]
+pub mod test_utils;
+
 use axum::{response::Html, routing::get, Router};
+use config::ScrapeConfig;
 use metrics::collectors_task;
 use prometheus::Registry;
-use scrape_config::ScrapeConfig;
 use std::{error::Error, net::SocketAddr};
 use tokio::net::TcpListener;
 use tracing::{info, instrument};
@@ -63,29 +66,6 @@ async fn web_server(
     });
 
     server.await
-}
-
-#[cfg(test)]
-pub mod test_utils {
-    use std::{
-        net::SocketAddr,
-        sync::atomic::{AtomicU16, Ordering},
-    };
-    use tokio::sync::OnceCell;
-
-    pub fn next_addr() -> SocketAddr {
-        static PORT: AtomicU16 = AtomicU16::new(9000);
-
-        let next_port = PORT.fetch_add(1, Ordering::SeqCst);
-        format!("127.0.0.1:{next_port}").parse().unwrap()
-    }
-
-    pub async fn init_tracing() {
-        static INIT: OnceCell<()> = OnceCell::const_new();
-
-        INIT.get_or_init(async || tracing_subscriber::fmt::try_init().unwrap())
-            .await;
-    }
 }
 
 #[cfg(test)]
