@@ -256,7 +256,7 @@ sources:
                       # can be overridden in the DB/query section
 
     databases:   # list of the databases inside the instance, mandatory
-      - name: ""  # DB name, mandatory
+      - dbname: ""  # DB name, mandatory
         scrape_interval: 30m  # the same as above, applied to all queries of the DB, optional
         query_timeout: 10s    # the same as above, applied to all queries of the DB, optional
         metric_expiration_time: 0s  # if all query attempts during this time were failed,
@@ -322,7 +322,7 @@ sources:
             .
           - query: ...
 
-      - name: "" # next db at the same instance
+      - dbname: "" # next db at the same instance
         .
         .
         .

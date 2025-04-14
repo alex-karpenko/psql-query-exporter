@@ -3,8 +3,13 @@ use crate::{
     errors::PsqlExporterError,
 };
 use core::fmt::Display;
-use serde::Deserialize;
-use std::{collections::HashMap, env, fs::read_to_string, time::Duration};
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::{BTreeMap, HashMap},
+    env,
+    fs::read_to_string,
+    time::Duration,
+};
 
 const DEFAULT_SCRAPE_INTERVAL: Duration = Duration::from_secs(1800);
 const DEFAULT_QUERY_TIMEOUT: Duration = Duration::from_secs(10);
@@ -12,15 +17,15 @@ const DEFAULT_METRIC_EXPIRATION_TIME: Duration = Duration::ZERO;
 const DB_CONNECTION_DEFAULT_BACKOFF_INTERVAL: Duration = Duration::from_secs(10);
 const DB_CONNECTION_MAXIMUM_BACKOFF_INTERVAL: Duration = Duration::from_secs(300);
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ScrapeConfig {
     #[serde(default)]
     defaults: ScrapeConfigDefaults,
-    pub sources: HashMap<String, ScrapeConfigSource>,
+    pub sources: BTreeMap<String, ScrapeConfigSource>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields, default)]
 struct ScrapeConfigDefaults {
     #[serde(with = "humantime_serde")]
@@ -40,7 +45,7 @@ struct ScrapeConfigDefaults {
     sslmode: PostgresSslMode,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ScrapeConfigSource {
     host: String,
@@ -67,7 +72,7 @@ pub struct ScrapeConfigSource {
     pub databases: Vec<ScrapeConfigDatabase>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ScrapeConfigDatabase {
     pub dbname: String,
@@ -93,7 +98,7 @@ pub struct ScrapeConfigDatabase {
     pub queries: Vec<ScrapeConfigQuery>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ScrapeConfigQuery {
     pub query: String,
@@ -107,14 +112,14 @@ pub struct ScrapeConfigQuery {
     #[serde(with = "humantime_serde", default)]
     pub metric_expiration_time: Duration,
     #[serde(default)]
-    pub const_labels: Option<HashMap<String, String>>,
+    pub const_labels: Option<BTreeMap<String, String>>,
     #[serde(default)]
     pub var_labels: Option<Vec<String>>,
     #[serde(default)]
     pub values: ScrapeConfigValues,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields, untagged)]
 pub enum ScrapeConfigValues {
     #[serde(rename = "single")]
@@ -127,7 +132,7 @@ pub enum ScrapeConfigValues {
     },
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FieldWithType {
     pub field: Option<String>,
@@ -135,16 +140,16 @@ pub struct FieldWithType {
     pub field_type: FieldType,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FieldWithLabels {
     pub field: String,
     #[serde(rename = "type", default)]
     pub field_type: FieldType,
-    pub labels: HashMap<String, String>,
+    pub labels: BTreeMap<String, String>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FieldWithSuffix {
     pub field: String,
@@ -153,7 +158,7 @@ pub struct FieldWithSuffix {
     pub suffix: String,
 }
 
-#[derive(Deserialize, Debug, Default)]
+#[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(deny_unknown_fields, rename_all = "lowercase")]
 pub enum FieldType {
     #[default]
@@ -490,7 +495,6 @@ fn substitute_envs(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use insta::assert_debug_snapshot;
     use insta::with_settings;
     use rstest::rstest;
 
@@ -532,12 +536,24 @@ mod tests {
 
     #[rstest]
     #[case("empty")]
-    #[case("override_defaults")]
+    #[case("defaults")]
+    #[case("envs")]
+    #[case("full")]
     fn test_scrape_config_parsing(#[case] name: &str) {
+        use insta::assert_yaml_snapshot;
+
+        env::set_var("TEST_PG_HOST", "host.from.env.com");
+        env::set_var("TEST_PG_USER", "user_from_env");
+        env::set_var("TEST_PG_PASSWORD", "password.from.env");
+        env::set_var("TEST_PG_SSLROOTCERT", "/env/path/to/rootcert");
+        env::set_var("TEST_PG_SSLCERT", "/env/path/to/cert");
+        env::set_var("TEST_PG_SSLKEY", "/env/path/to/key");
+
         let config = ScrapeConfig::from_file(&format!("tests/configs/{name}.yaml")).unwrap();
+        let snapshot_suffix = format!("scrape_config_parsing__{name}");
         with_settings!(
             { description => format!("config file: {name}"), omit_expression => true },
-            { assert_debug_snapshot!(format!("scrape_config_parsing__{name}"), config) }
+            { assert_yaml_snapshot!(snapshot_suffix, config) }
         );
     }
 }

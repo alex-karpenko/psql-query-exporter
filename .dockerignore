@@ -1,5 +1,6 @@
 target
 docker_tests
+tests
 .git
 .github
 
@@ -9,3 +10,4 @@ config-*.yaml
 *.pem
 *.crt
 *.key
+src/snapshots

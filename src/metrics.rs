@@ -9,6 +9,7 @@ use prometheus::core::{AtomicF64, AtomicI64, Collector, GenericGauge, GenericGau
 use prometheus::{
     opts, Encoder, Gauge, GaugeVec, IntGauge, IntGaugeVec, Opts, Registry, TextEncoder,
 };
+use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
 use tokio::sync::mpsc;
 use tokio_postgres::Row;
@@ -52,7 +53,9 @@ impl QueryMetrics {
                 );
 
                 if let Some(const_labels) = &query_config.const_labels {
-                    opts = opts.const_labels(const_labels.clone());
+                    let const_labels: HashMap<String, String> =
+                        const_labels.clone().into_iter().collect();
+                    opts = opts.const_labels(const_labels);
                 }
 
                 let new_metric =
@@ -75,7 +78,9 @@ impl QueryMetrics {
                     );
 
                     if let Some(const_labels) = &query_config.const_labels {
-                        let mut const_labels = const_labels.clone();
+                        let mut const_labels: HashMap<String, String> =
+                            const_labels.clone().into_iter().collect();
+
                         value.labels.iter().for_each(|(k, v)| {
                             const_labels.insert(k.to_string(), v.to_string());
                         });
@@ -108,7 +113,9 @@ impl QueryMetrics {
                     let mut opts = opts!(metric_name, metric_desc);
 
                     if let Some(const_labels) = &query_config.const_labels {
-                        opts = opts.const_labels(const_labels.clone());
+                        let const_labels: HashMap<String, String> =
+                            const_labels.clone().into_iter().collect();
+                        opts = opts.const_labels(const_labels);
                     }
                     let new_metric = Self::helper_create_metric(
                         &query_config.var_labels,

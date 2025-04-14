@@ -4,7 +4,7 @@ use crate::{
 };
 use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
 use postgres_openssl::MakeTlsConnector;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Debug, Display},
     time::Duration,
@@ -88,7 +88,7 @@ pub struct PostgresConnection {
     shutdown_channel: ShutdownReceiver,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum PostgresSslMode {
     Disable,
