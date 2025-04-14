@@ -1,5 +1,13 @@
 # psql-query-exporter
 
+<p>
+<a href="https://github.com/alex-karpenko/psql-query-exporter/actions/workflows/ci.yaml" rel="nofollow"><img src="https://img.shields.io/github/actions/workflow/status/alex-karpenko/psql-query-exporter/ci.yaml?label=ci" alt="CI status"></a>
+<a href="https://github.com/alex-karpenko/psql-query-exporter/actions/workflows/audit.yaml" rel="nofollow"><img src="https://img.shields.io/github/actions/workflow/status/alex-karpenko/psql-query-exporter/audit.yaml?label=audit" alt="Audit status"></a>
+<a href="https://github.com/alex-karpenko/psql-query-exporter/actions/workflows/publish-image.yaml" rel="nofollow"><img src="https://img.shields.io/github/actions/workflow/status/alex-karpenko/psql-query-exporter/publish-image.yaml?label=publish" alt="Docker image publishing status"></a>
+<a href="https://app.codecov.io/github/alex-karpenko/psql-query-exporter" rel="nofollow"><img src="https://img.shields.io/codecov/c/github/alex-karpenko/psql-query-exporter" alt="License"></a>
+<a href="https://github.com/alex-karpenko/psql-query-exporter/blob/HEAD/LICENSE" rel="nofollow"><img src="https://img.shields.io/github/license/alex-karpenko/psql-query-exporter" alt="License"></a>
+</p>
+
 [Prometheus](https://prometheus.io/docs/introduction/overview/) exporter to produce metrics from [PostgreSQL](https://www.postgresql.org/) queries on a periodic basis.
 
 ## Features

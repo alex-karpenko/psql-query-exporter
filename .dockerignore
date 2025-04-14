@@ -1,11 +1,11 @@
 target
-tests
+docker_tests
 .git
 .github
 
-values-dev.yaml
-values-test.yaml
-config-dev.yaml
-config-local.yaml
+values-*.yaml
+config-*.yaml
 .vscode
 *.pem
+*.crt
+*.key
