@@ -535,11 +535,11 @@ mod tests {
     }
 
     #[rstest]
-    #[case("empty")]
-    #[case("defaults")]
-    #[case("envs")]
-    #[case("full")]
-    fn test_scrape_config_parsing(#[case] name: &str) {
+    #[case("empty", 0)]
+    #[case("defaults", 0)]
+    #[case("envs", 1)]
+    #[case("full", 3)]
+    fn test_scrape_config_parsing(#[case] name: &str, #[case] len: usize) {
         use insta::assert_yaml_snapshot;
 
         env::set_var("TEST_PG_HOST", "host.from.env.com");
@@ -555,5 +555,8 @@ mod tests {
             { description => format!("config file: {name}"), omit_expression => true },
             { assert_yaml_snapshot!(snapshot_suffix, config) }
         );
+
+        assert_eq!(config.len(), len);
+        assert!(config.is_empty() == (len == 0));
     }
 }
