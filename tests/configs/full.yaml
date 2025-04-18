@@ -54,6 +54,13 @@ sources:
                 field: field1
                 type: float
 
+      - dbname: "s1db3"
+        queries:
+          - query: "SELECT field`` from table2"
+            description: "s1db3 test metric"
+            metric_name: "s1db3_test_metric"
+            metric_prefix: null
+
   source_name_2:
     host: "host2.com"
     port: 4321
@@ -62,7 +69,7 @@ sources:
     sslmode: disable
     scrape_interval: 30m
     query_timeout: 10s
-    metric_expiration_time: 0s
+    metric_expiration_time: 10s
     backoff_interval: 10s
     max_backoff_interval: 300s
     metric_prefix: source2_prefix
@@ -71,7 +78,7 @@ sources:
       - dbname: "s2db1"
         scrape_interval: 30m
         query_timeout: 10s
-        metric_expiration_time: 0s
+        metric_expiration_time: 20s
         backoff_interval: 10s
         max_backoff_interval: 300s
 
@@ -81,7 +88,7 @@ sources:
             metric_name: "s2db1_two_fileds_multi_labels_values"
             scrape_interval: 30m
             query_timeout: 10s
-            metric_expiration_time: 0s
+            metric_expiration_time: 30s
             metric_prefix: ""
 
             const_labels:
@@ -107,9 +114,12 @@ sources:
 
   source_name_3:
     host: "host3.com"
-    port: 5432
     user: "user3"
     password: "EXPOSED_PG_PASSWORD"
+    sslmode: verify-full
+    sslrootcert: tests/tls/overriden/ca.pem
+    sslcert: tests/tls/overriden/client.crt
+    sslkey: test/tls/overriden/client.key
 
     databases:
       - dbname: "s3db1"

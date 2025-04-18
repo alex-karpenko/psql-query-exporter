@@ -80,6 +80,29 @@ sources:
               single:
                 field: field1
                 type: float
+      - dbname: s1db3
+        scrape_interval: 1m
+        query_timeout: 10s
+        backoff_interval: 20s
+        max_backoff_interval: 5m
+        metric_expiration_time: 2h
+        metric_prefix: source1_prefix
+        sslcert: tests/tls/client.crt
+        sslkey: test/tls/client.key
+        queries:
+          - query: "SELECT field`` from table2"
+            metric_name: source1_prefix_s1db3_test_metric
+            description: s1db3 test metric
+            metric_prefix: source1_prefix
+            scrape_interval: 1m
+            query_timeout: 10s
+            metric_expiration_time: 2h
+            const_labels: ~
+            var_labels: ~
+            values:
+              single:
+                field: ~
+                type: int
   source_name_2:
     host: host2.com
     port: 4321
@@ -90,7 +113,7 @@ sources:
     query_timeout: 10s
     backoff_interval: 10s
     max_backoff_interval: 5m
-    metric_expiration_time: 1h
+    metric_expiration_time: 10s
     metric_prefix: source2_prefix
     sslrootcert: tests/tls/ca.pem
     sslcert: tests/tls/client.crt
@@ -101,7 +124,7 @@ sources:
         query_timeout: 10s
         backoff_interval: 10s
         max_backoff_interval: 5m
-        metric_expiration_time: 1h
+        metric_expiration_time: 20s
         metric_prefix: source2_prefix
         sslcert: tests/tls/client.crt
         sslkey: test/tls/client.key
@@ -112,7 +135,7 @@ sources:
             metric_prefix: ""
             scrape_interval: 30m
             query_timeout: 10s
-            metric_expiration_time: 1h
+            metric_expiration_time: 30s
             const_labels:
               label1: label_value1
               label2: label_value2
@@ -136,16 +159,16 @@ sources:
     port: 5432
     user: user3
     password: EXPOSED_PG_PASSWORD
-    sslmode: verify-ca
+    sslmode: verify-full
     scrape_interval: 20s
     query_timeout: 2s
     backoff_interval: 5s
     max_backoff_interval: 1m 40s
     metric_expiration_time: 1h
     metric_prefix: test_metrics_prefix
-    sslrootcert: tests/tls/ca.pem
-    sslcert: tests/tls/client.crt
-    sslkey: test/tls/client.key
+    sslrootcert: tests/tls/overriden/ca.pem
+    sslcert: tests/tls/overriden/client.crt
+    sslkey: test/tls/overriden/client.key
     databases:
       - dbname: s3db1
         scrape_interval: 20s
@@ -154,8 +177,8 @@ sources:
         max_backoff_interval: 1m 40s
         metric_expiration_time: 1h
         metric_prefix: s3db1_metrics_prefix
-        sslcert: tests/tls/client.crt
-        sslkey: test/tls/client.key
+        sslcert: tests/tls/overriden/client.crt
+        sslkey: test/tls/overriden/client.key
         queries:
           - query: select * from table4
             metric_name: multi_suffixes_metric_prefix_multi_suffixes_metric_name

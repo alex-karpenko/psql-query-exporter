@@ -559,4 +559,35 @@ mod tests {
         assert_eq!(config.len(), len);
         assert!(config.is_empty() == (len == 0));
     }
+
+    #[test]
+    fn test_scrape_config_database_display() {
+        let db = ScrapeConfigDatabase {
+            dbname: "testdb".to_string(),
+            connection_string: PostgresConnectionString {
+                host: "localhost".to_string(),
+                port: 5432,
+                user: "postgres".to_string(),
+                password: "password".to_string(),
+                sslmode: PostgresSslMode::Prefer,
+                dbname: "testdb".to_string(),
+            },
+            sslmode: None,
+            scrape_interval: Duration::default(),
+            query_timeout: Duration::default(),
+            backoff_interval: Duration::default(),
+            max_backoff_interval: Duration::default(),
+            metric_expiration_time: Duration::default(),
+            metric_prefix: None,
+            sslrootcert: None,
+            sslcert: None,
+            sslkey: None,
+            queries: vec![],
+        };
+
+        assert_eq!(
+            db.to_string(),
+            "host: localhost, port: 5432, user: postgres, dbname: testdb"
+        );
+    }
 }
