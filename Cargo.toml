@@ -27,7 +27,8 @@ tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter", "json"] }
 
 [dev-dependencies]
-insta = { version = "1.42.2", features = ["yaml", "redactions"] }
+insta = { version = "1.42.2", features = ["yaml"] }
 rcgen = { version = "0.13.2", default-features = false, features = ["pem", "ring"] }
 reqwest = { version = "0.12.15", default-features = false }
 rstest = "0.25.0"
+testcontainers = { version = "0.23.3", features = ["blocking"] }

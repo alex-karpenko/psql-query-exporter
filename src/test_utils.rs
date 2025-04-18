@@ -116,16 +116,16 @@ impl TestTlsCerts {
     pub async fn store_to(&self, folder: &str) -> Result<(), Box<dyn Error>> {
         fs::create_dir_all(folder).await?;
 
-        fs::write(format!("{folder}/server.pem"), &self.server_cert).await?;
+        fs::write(format!("{folder}/server.crt"), &self.server_cert).await?;
         fs::write(format!("{folder}/server.key"), &self.server_key).await?;
-        fs::write(format!("{folder}/client.pem"), &self.client_cert).await?;
+        fs::write(format!("{folder}/client.crt"), &self.client_cert).await?;
         fs::write(format!("{folder}/client.key"), &self.client_key).await?;
         fs::write(format!("{folder}/ca.pem"), &self.ca).await?;
 
         for file in [
-            "server.pem",
+            "server.crt",
             "server.key",
-            "client.pem",
+            "client.crt",
             "client.key",
             "ca.pem",
         ] {
@@ -133,5 +133,201 @@ impl TestTlsCerts {
         }
 
         Ok(())
+    }
+}
+
+mod images {
+    use std::{borrow::Cow, collections::HashMap, env};
+    use testcontainers::{core::WaitFor, CopyDataSource, CopyToContainer, Image};
+
+    const NAME: &str = "postgres";
+    const DEFAULT_PG_VERSION: &str = "17";
+
+    /// Module to work with [`Postgres`] inside of tests.
+    ///
+    /// Starts an instance of Postgres.
+    /// This module is based on the official [`Postgres docker image`].
+    ///
+    /// Default db name, user and password is `postgres`.
+    ///
+    /// # Example
+    /// ```
+    /// use test_utils::{images, testcontainers::runners::SyncRunner};
+    ///
+    /// let postgres_instance = images::Postgres::default().start().unwrap();
+    ///
+    /// let connection_string = format!(
+    ///     "postgres://postgres:postgres@{}:{}/postgres",
+    ///     postgres_instance.get_host().unwrap(),
+    ///     postgres_instance.get_host_port_ipv4(5432).unwrap()
+    /// );
+    /// ```
+    #[derive(Debug, Clone)]
+    pub struct Postgres {
+        env_vars: HashMap<String, String>,
+        copy_to_sources: Vec<CopyToContainer>,
+        cmd: Vec<String>,
+        fsync_enabled: bool,
+    }
+
+    impl Postgres {
+        /// Set `method` as default auth method for any host/db/user,
+        /// it adds the following line to the end of the `pg_hba.conf`:
+        /// ```host all all all {method}"```
+        pub fn with_auth_method(mut self, method: &str) -> Self {
+            self.env_vars
+                .insert("POSTGRES_HOST_AUTH_METHOD".to_owned(), method.to_owned());
+            self
+        }
+
+        /// Sets the db name for the Postgres instance.
+        pub fn with_db_name(mut self, db_name: &str) -> Self {
+            self.env_vars
+                .insert("POSTGRES_DB".to_owned(), db_name.to_owned());
+            self
+        }
+
+        /// Sets the user for the Postgres instance.
+        pub fn with_user(mut self, user: &str) -> Self {
+            self.env_vars
+                .insert("POSTGRES_USER".to_owned(), user.to_owned());
+            self
+        }
+
+        /// Sets the password for the Postgres instance.
+        pub fn with_password(mut self, password: &str) -> Self {
+            self.env_vars
+                .insert("POSTGRES_PASSWORD".to_owned(), password.to_owned());
+            self
+        }
+
+        /// Registers sql to be executed automatically when the container starts.
+        /// Can be called multiple times to add (not override) scripts.
+        ///
+        /// # Example
+        ///
+        /// ```
+        /// # use testcontainers_modules::postgres::Postgres;
+        /// let postgres_image = Postgres::default().with_init_sql(
+        ///     "CREATE EXTENSION IF NOT EXISTS hstore;"
+        ///         .to_string()
+        ///         .into_bytes(),
+        /// );
+        /// ```
+        ///
+        /// ```rust,ignore
+        /// # use testcontainers_modules::postgres::Postgres;
+        /// let postgres_image = Postgres::default()
+        ///                                .with_init_sql(include_str!("path_to_init.sql").to_string().into_bytes());
+        /// ```
+        pub fn with_init_sql(mut self, init_sql: impl Into<CopyDataSource>) -> Self {
+            let target = format!(
+                "/docker-entrypoint-initdb.d/init_{i}.sql",
+                i = self.copy_to_sources.len()
+            );
+            self.copy_to_sources
+                .push(CopyToContainer::new(init_sql.into(), target));
+            self
+        }
+
+        /// Enable SSL on server and copy certificates to config folder
+        pub fn with_ssl_enabled(
+            mut self,
+            ca_cert: impl Into<CopyDataSource>,
+            server_cert: impl Into<CopyDataSource>,
+            server_key: impl Into<CopyDataSource>,
+        ) -> Self {
+            const SSL_CMDS: [&str; 8] = [
+                "-c",
+                "ssl=on",
+                "-c",
+                "ssl_ca_file=ca.pem",
+                "-c",
+                "ssl_cert_file=server.crt",
+                "-c",
+                "ssl_key_file=server.key",
+            ];
+
+            self.copy_to_sources.push(CopyToContainer::new(
+                ca_cert.into(),
+                "/var/lib/postgresql/data/ca.pem".to_owned(),
+            ));
+            self.copy_to_sources.push(CopyToContainer::new(
+                server_cert.into(),
+                "/var/lib/postgresql/data/server.crt".to_owned(),
+            ));
+            self.copy_to_sources.push(CopyToContainer::new(
+                server_key.into(),
+                "/var/lib/postgresql/data/server.key".to_owned(),
+            ));
+
+            SSL_CMDS
+                .into_iter()
+                .map(String::from)
+                .for_each(|s| self.cmd.push(s));
+
+            self
+        }
+
+        /// Enables [the fsync-setting](https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-FSYNC) for the Postgres instance.
+        pub fn with_fsync_enabled(mut self) -> Self {
+            self.fsync_enabled = true;
+            self
+        }
+    }
+
+    impl Default for Postgres {
+        fn default() -> Self {
+            let mut env_vars = HashMap::new();
+            env_vars.insert("POSTGRES_DB".to_owned(), "postgres".to_owned());
+            env_vars.insert("POSTGRES_USER".to_owned(), "postgres".to_owned());
+            env_vars.insert("POSTGRES_PASSWORD".to_owned(), "postgres".to_owned());
+
+            Self {
+                env_vars,
+                copy_to_sources: Vec::new(),
+                cmd: Vec::new(),
+                fsync_enabled: false,
+            }
+        }
+    }
+
+    impl Image for Postgres {
+        fn name(&self) -> &str {
+            NAME
+        }
+
+        fn tag(&self) -> &str {
+            let version = env::var("PG_VERSION").unwrap_or_else(|_| DEFAULT_PG_VERSION.to_owned());
+            Box::leak(format!("{version}-alpine").into_boxed_str())
+        }
+
+        fn ready_conditions(&self) -> Vec<WaitFor> {
+            vec![
+                WaitFor::message_on_stderr("database system is ready to accept connections"),
+                WaitFor::message_on_stdout("database system is ready to accept connections"),
+            ]
+        }
+
+        fn env_vars(
+            &self,
+        ) -> impl IntoIterator<Item = (impl Into<Cow<'_, str>>, impl Into<Cow<'_, str>>)> {
+            &self.env_vars
+        }
+
+        fn copy_to_sources(&self) -> impl IntoIterator<Item = &CopyToContainer> {
+            &self.copy_to_sources
+        }
+
+        fn cmd(&self) -> impl IntoIterator<Item = impl Into<std::borrow::Cow<'_, str>>> {
+            let mut cmd: Vec<&str> = self.cmd.iter().map(String::as_str).collect();
+
+            if !self.fsync_enabled {
+                cmd.push("-c");
+                cmd.push("fsync=off");
+            }
+
+            cmd
+        }
     }
 }
