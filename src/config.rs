@@ -109,9 +109,9 @@ impl TryFrom<String> for TcpPort {
     }
 }
 
-impl Into<u16> for TcpPort {
-    fn into(self) -> u16 {
-        self.0
+impl From<TcpPort> for u16 {
+    fn from(value: TcpPort) -> Self {
+        value.0
     }
 }
 
