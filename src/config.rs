@@ -49,8 +49,8 @@ struct ScrapeConfigDefaults {
 #[serde(deny_unknown_fields)]
 pub struct ScrapeConfigSource {
     host: String,
-    #[serde(default = "ScrapeConfigSource::default_port")]
-    port: u16,
+    #[serde(default)]
+    port: TcpPort,
     user: String,
     password: String,
     #[serde(default)]
@@ -70,6 +70,49 @@ pub struct ScrapeConfigSource {
     sslcert: Option<String>,
     sslkey: Option<String>,
     pub databases: Vec<ScrapeConfigDatabase>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[serde(try_from = "String")]
+#[serde(into = "u16")]
+pub struct TcpPort(u16);
+
+impl Default for TcpPort {
+    fn default() -> Self {
+        Self(5432)
+    }
+}
+
+impl TcpPort {
+    fn parse_string_value(s: &String) -> Result<u16, PsqlExporterError> {
+        let s = if envsubst::is_templated(s) {
+            let envs = hashmap_from_envs();
+            &envsubst::substitute(s, &envs)
+                .map_err(|e| PsqlExporterError::InvalidConfigValue(e.to_string()))?
+        } else {
+            s
+        };
+
+        let port: u16 = s
+            .parse()
+            .map_err(|_| PsqlExporterError::InvalidConfigValue(format!("port number: {}", s)))?;
+        Ok(port)
+    }
+}
+
+impl TryFrom<String> for TcpPort {
+    type Error = PsqlExporterError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        let port = Self::parse_string_value(&value)?;
+        Ok(Self(port))
+    }
+}
+
+impl Into<u16> for TcpPort {
+    fn into(self) -> u16 {
+        self.0
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -227,10 +270,6 @@ impl ScrapeConfigDefaults {
 }
 
 impl ScrapeConfigSource {
-    fn default_port() -> u16 {
-        5432
-    }
-
     fn propagate_defaults(&mut self, defaults: &ScrapeConfigDefaults) {
         let defaults = ScrapeConfigDefaults {
             scrape_interval: if self.scrape_interval == Duration::default() {
@@ -303,7 +342,7 @@ impl ScrapeConfigSource {
         self.databases.iter_mut().for_each(|db| {
             let conn_string = PostgresConnectionString {
                 host: self.host.clone(),
-                port: self.port,
+                port: self.port.into(),
                 user: self.user.clone(),
                 password: self.password.clone(),
                 sslmode: self.sslmode.clone().unwrap(),
@@ -543,6 +582,7 @@ mod tests {
         use insta::assert_yaml_snapshot;
 
         env::set_var("TEST_PG_HOST", "host.from.env.com");
+        env::set_var("TEST_PG_PORT", "54321");
         env::set_var("TEST_PG_USER", "user_from_env");
         env::set_var("TEST_PG_PASSWORD", "password.from.env");
         env::set_var("TEST_PG_SSLROOTCERT", "/env/path/to/rootcert");

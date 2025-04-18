@@ -10,6 +10,8 @@ pub enum PsqlExporterError {
         #[from]
         cause: serde_yaml_ng::Error,
     },
+    #[error("unable to parse config: {0}")]
+    InvalidConfigValue(String),
     #[error("some environment variable(s) not defined: {0}")]
     UndefinedEnvironmentVariables(String),
     #[error("unable to substitute environment variables: {0}")]

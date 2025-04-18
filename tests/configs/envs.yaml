@@ -1,7 +1,7 @@
 sources:
   source_name_with_envs:
     host: "${TEST_PG_HOST}"
-    port: 1234
+    port: ${TEST_PG_PORT}
     user: "${TEST_PG_USER}"
     password: "${TEST_PG_PASSWORD}"
     sslmode: verify-full

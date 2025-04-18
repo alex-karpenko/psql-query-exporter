@@ -16,7 +16,7 @@ defaults:
 sources:
   source_name_with_envs:
     host: host.from.env.com
-    port: 1234
+    port: 54321
     user: user_from_env
     password: password.from.env
     sslmode: verify-full
