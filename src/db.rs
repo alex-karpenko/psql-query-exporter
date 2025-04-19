@@ -363,4 +363,100 @@ impl PostgresConnection {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+    use crate::test_utils::{
+        init_psql_server, init_tracing, TEST_DB_NAME, TEST_DB_PASSWORD, TEST_DB_USER,
+    };
+
+    async fn create_test_connection_string(sslmode: PostgresSslMode) -> PostgresConnectionString {
+        init_tracing().await;
+        let port = init_psql_server().await;
+
+        PostgresConnectionString {
+            host: "localhost".to_string(),
+            port,
+            dbname: TEST_DB_NAME.to_string(),
+            user: TEST_DB_USER.to_string(),
+            password: TEST_DB_PASSWORD.to_string(),
+            sslmode,
+        }
+    }
+
+    #[test]
+    fn test_db_connection_string_format() {
+        let conn_string = PostgresConnectionString {
+            host: "localhost".to_string(),
+            port: 4321,
+            dbname: "XXXXXXXX".to_string(),
+            user: "YYYYYYYY".to_string(),
+            password: "ZZZZZZZ".to_string(),
+            sslmode: PostgresSslMode::Prefer,
+        };
+
+        assert_eq!(
+            conn_string.get_conn_string(),
+            format!("host=localhost port=4321 dbname=XXXXXXXX user=YYYYYYYY password='ZZZZZZZ' sslmode=prefer application_name={}-v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
+        );
+    }
+
+    #[test]
+    fn test_db_connection_string_display() {
+        let conn_string = PostgresConnectionString {
+            host: "localhost".to_string(),
+            port: 4321,
+            dbname: "XXXXXXXX".to_string(),
+            user: "YYYYYYYY".to_string(),
+            password: "ZZZZZZZ".to_string(),
+            sslmode: PostgresSslMode::Prefer,
+        };
+
+        assert_eq!(
+            conn_string.to_string(),
+            format!("host=localhost port=4321 dbname=XXXXXXXX user=YYYYYYYY password='***' sslmode=prefer application_name={}-v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_db_connection_query() {
+        let conn_string = create_test_connection_string(PostgresSslMode::Disable).await;
+        let (_tx, rx) = tokio::sync::watch::channel(false);
+
+        let mut connection = PostgresConnection::new(
+            conn_string,
+            PostgresSslMode::Disable,
+            PostgresSslCertificates::from(None, None, None).unwrap(),
+            Duration::from_secs(1),
+            Duration::from_secs(5),
+            rx,
+        )
+        .await
+        .unwrap();
+
+        let result = connection
+            .query("SELECT 1;", Duration::from_secs(1))
+            .await
+            .unwrap();
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].get::<_, i32>(0), 1);
+
+        let result = connection
+            .query("SELECT count(1) from basics;", Duration::from_secs(1))
+            .await
+            .unwrap();
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].get::<_, i64>(0), 3);
+
+        let result = connection
+            .query("SELECT id from basics;", Duration::from_secs(1))
+            .await
+            .unwrap();
+
+        assert_eq!(result.len(), 3);
+        for i in 0..3 {
+            assert_eq!(result[i].get::<_, i64>(0), i as i64 + 1);
+        }
+    }
+}

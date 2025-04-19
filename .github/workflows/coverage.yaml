@@ -30,7 +30,7 @@ jobs:
       - name: Generate TLS certificates
         run: |
           tests/scripts/create-test-certificates.sh
-          sudo chmod 400 tests/tls/server.key
+          sudo chmod 400 tests/tls/*.key
           sudo chown 70 tests/tls/server.key
 
       - name: Test

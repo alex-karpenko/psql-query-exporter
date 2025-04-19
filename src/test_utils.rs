@@ -7,6 +7,10 @@ use testcontainers::{runners::AsyncRunner, ContainerAsync, ImageExt};
 use tokio::sync::OnceCell;
 use tracing::info;
 
+pub const TEST_DB_NAME: &str = "exporter";
+pub const TEST_DB_USER: &str = "exporter";
+pub const TEST_DB_PASSWORD: &str = "test-exporter-password";
+
 pub fn next_addr() -> SocketAddr {
     static PORT: AtomicU16 = AtomicU16::new(9000);
 
@@ -45,9 +49,9 @@ async fn psql_server_container() -> &'static ContainerAsync<images::Postgres> {
     PSQL_CONTAINER
         .get_or_init(async || {
             images::Postgres::default()
-                .with_db_name("exporter")
-                .with_user("exporter")
-                .with_password("test-exporter-password")
+                .with_db_name(TEST_DB_NAME)
+                .with_user(TEST_DB_USER)
+                .with_password(TEST_DB_PASSWORD)
                 .with_init_sql(Path::new("tests/init/init_db.sql"))
                 .with_init_sh(Path::new("tests/init/init_conf.sh"))
                 .with_ssl_enabled()
