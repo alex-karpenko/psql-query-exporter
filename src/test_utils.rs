@@ -150,9 +150,6 @@ static PSQL_CONTAINER: OnceCell<ContainerAsync<images::Postgres>> = OnceCell::co
 
 pub async fn init_psql_server() -> u16 {
     init_tracing().await;
-    // init_certs("localhost", "exporter", "tests/tls")
-    //     .await
-    //     .unwrap();
 
     let port = psql_server_container()
         .await
@@ -340,11 +337,11 @@ mod images {
                 cmd.push("-c");
                 cmd.push("ssl=on");
                 cmd.push("-c");
-                cmd.push("ssl_ca_file=/tmp/certs/ca.pem");
+                cmd.push("ssl_ca_file=/certs/ca.pem");
                 cmd.push("-c");
-                cmd.push("ssl_cert_file=/tmp/certs/server.crt");
+                cmd.push("ssl_cert_file=/certs/server.crt");
                 cmd.push("-c");
-                cmd.push("ssl_key_file=/tmp/certs/server.key");
+                cmd.push("ssl_key_file=/certs/server.key");
             }
 
             cmd

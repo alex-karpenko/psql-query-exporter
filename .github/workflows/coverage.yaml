@@ -32,7 +32,6 @@ jobs:
           tests/scripts/create-test-certificates.sh
           sudo chmod 400 tests/tls/server.key
           sudo chown 70 tests/tls/server.key
-          ls -l tests/tls
 
       - name: Test
         env:
