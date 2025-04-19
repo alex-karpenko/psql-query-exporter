@@ -361,3 +361,6 @@ impl PostgresConnection {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {}
