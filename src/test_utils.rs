@@ -139,14 +139,14 @@ impl TestTlsCerts {
             "client.key",
             "ca.pem",
         ] {
-            fs::set_permissions(format!("{folder}/{file}"), Permissions::from_mode(0o400)).await?;
+            fs::set_permissions(format!("{folder}/{file}"), Permissions::from_mode(0o644)).await?;
         }
 
         Ok(())
     }
 }
 
-static CONTAINER: OnceCell<ContainerAsync<images::Postgres>> = OnceCell::const_new();
+static PSQL_CONTAINER: OnceCell<ContainerAsync<images::Postgres>> = OnceCell::const_new();
 
 pub async fn init_psql_server() -> u16 {
     init_tracing().await;
@@ -170,7 +170,7 @@ pub async fn drop_psql_server() {
 }
 
 async fn psql_server_container() -> &'static ContainerAsync<images::Postgres> {
-    CONTAINER
+    PSQL_CONTAINER
         .get_or_init(async || {
             images::Postgres::default()
                 .with_db_name("exporter")
@@ -291,17 +291,18 @@ mod images {
                 ca_mount: Mount::bind_mount(
                     format!("{cargo_folder}/tests/tls/ca.pem"),
                     "/certs/ca.pem",
-                ),
-                // .with_access_mode(AccessMode::ReadOnly),
+                )
+                .with_access_mode(AccessMode::ReadOnly),
                 cert_mount: Mount::bind_mount(
                     format!("{cargo_folder}/tests/tls/server.crt"),
                     "/certs/server.crt",
-                ),
-                // .with_access_mode(AccessMode::ReadOnly),
+                )
+                .with_access_mode(AccessMode::ReadOnly),
                 key_mount: Mount::bind_mount(
                     format!("{cargo_folder}/tests/tls/server.key"),
                     "/certs/server.key",
-                ), // .with_access_mode(AccessMode::ReadOnly),
+                )
+                .with_access_mode(AccessMode::ReadOnly),
             }
         }
     }
@@ -339,11 +340,11 @@ mod images {
                 cmd.push("-c");
                 cmd.push("ssl=on");
                 cmd.push("-c");
-                cmd.push("ssl_ca_file=/certs/ca.pem");
+                cmd.push("ssl_ca_file=/tmp/certs/ca.pem");
                 cmd.push("-c");
-                cmd.push("ssl_cert_file=/certs/server.crt");
+                cmd.push("ssl_cert_file=/tmp/certs/server.crt");
                 cmd.push("-c");
-                cmd.push("ssl_key_file=/certs/server.key");
+                cmd.push("ssl_key_file=/tmp/certs/server.key");
             }
 
             cmd
