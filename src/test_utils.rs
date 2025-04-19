@@ -1,13 +1,16 @@
-use rcgen::{BasicConstraints, CertificateParams, IsCa, KeyPair};
+use rcgen::{BasicConstraints, CertificateParams, DnType, IsCa, KeyPair};
 use std::{
     env,
     error::Error,
     fs::Permissions,
     net::SocketAddr,
     os::unix::fs::PermissionsExt,
+    path::Path,
     sync::atomic::{AtomicU16, Ordering},
 };
+use testcontainers::{runners::AsyncRunner, ContainerAsync, ImageExt};
 use tokio::{fs, sync::OnceCell};
+use tracing::info;
 
 pub fn next_addr() -> SocketAddr {
     static PORT: AtomicU16 = AtomicU16::new(9000);
@@ -28,7 +31,7 @@ pub async fn default_certs(folder: Option<String>) -> Result<&'static String, Bo
         env::var("OUT_DIR").expect("OUT_DIR environment variable is not defined")
     });
 
-    init_certs("localhost", "client", &folder).await
+    init_certs("localhost", "exporter", &folder).await
 }
 
 pub async fn init_certs(
@@ -59,7 +62,7 @@ pub struct TestTlsCerts {
 
 impl Default for TestTlsCerts {
     fn default() -> Self {
-        Self::new("localhost", "client").unwrap()
+        Self::new("localhost", "exporter").unwrap()
     }
 }
 
@@ -73,10 +76,15 @@ impl TestTlsCerts {
         server: impl Into<String>,
         client: impl Into<String>,
     ) -> Result<Self, Box<dyn Error>> {
+        let server = server.into();
+
         // generate root CA key and cert
         let ca_key = KeyPair::generate()?;
-        let mut ca_cert = CertificateParams::new(vec!["Test Root CA".to_string()])?;
+        let mut ca_cert = CertificateParams::new(vec![])?;
         ca_cert.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
+        ca_cert
+            .distinguished_name
+            .push(DnType::CommonName, "Test Root CA".to_string());
         let ca_cert = ca_cert.self_signed(&ca_key)?;
 
         // prepare SANs
@@ -85,23 +93,25 @@ impl TestTlsCerts {
             "127.0.0.1".to_string(),
             "::1".to_string(),
         ];
-        let hostname = server.into();
-        if hostname != "localhost" {
-            hostnames.insert(0, hostname);
+        if server != "localhost" {
+            hostnames.insert(0, server.clone());
         }
 
         // and generate server key and cert
         let server_key = KeyPair::generate()?;
-        let server_cert =
-            CertificateParams::new(hostnames)?.signed_by(&server_key, &ca_cert, &ca_key)?;
+        let mut server_cert_params = CertificateParams::new(hostnames)?;
+        server_cert_params
+            .distinguished_name
+            .push(DnType::CommonName, server);
+        let server_cert = server_cert_params.signed_by(&server_key, &ca_cert, &ca_key)?;
 
         // client part
         let client_key = KeyPair::generate()?;
-        let client_cert = CertificateParams::new(vec![client.into()])?.signed_by(
-            &client_key,
-            &ca_cert,
-            &ca_key,
-        )?;
+        let mut client_cert_params = CertificateParams::new(vec![])?;
+        client_cert_params
+            .distinguished_name
+            .push(DnType::CommonName, client.into());
+        let client_cert = client_cert_params.signed_by(&client_key, &ca_cert, &ca_key)?;
 
         Ok(Self {
             server_cert: server_cert.pem(),
@@ -136,9 +146,53 @@ impl TestTlsCerts {
     }
 }
 
+static CONTAINER: OnceCell<ContainerAsync<images::Postgres>> = OnceCell::const_new();
+
+pub async fn init_psql_server() -> u16 {
+    init_tracing().await;
+    init_certs("localhost", "exporter", "tests/tls")
+        .await
+        .unwrap();
+
+    let port = psql_server_container()
+        .await
+        .get_host_port_ipv4(5432)
+        .await
+        .unwrap();
+    info!(%port, "postgres server started");
+
+    port
+}
+
+pub async fn drop_psql_server() {
+    let container = psql_server_container().await;
+    container.stop().await.unwrap();
+}
+
+async fn psql_server_container() -> &'static ContainerAsync<images::Postgres> {
+    CONTAINER
+        .get_or_init(async || {
+            images::Postgres::default()
+                .with_db_name("exporter")
+                .with_user("exporter")
+                .with_password("test-exporter-password")
+                .with_init_sql(Path::new("tests/init/init_db.sql"))
+                .with_init_sh(Path::new("tests/init/init_conf.sh"))
+                .with_ssl_enabled()
+                .with_container_name("test-psql-query-exporter")
+                .start()
+                .await
+                .unwrap()
+        })
+        .await
+}
+
 mod images {
     use std::{borrow::Cow, collections::HashMap, env};
-    use testcontainers::{core::WaitFor, CopyDataSource, CopyToContainer, Image};
+    use testcontainers::{
+        core::{AccessMode, Mount, WaitFor},
+        CopyDataSource, CopyToContainer, Image,
+    };
 
     const NAME: &str = "postgres";
     const DEFAULT_PG_VERSION: &str = "17";
@@ -166,20 +220,13 @@ mod images {
     pub struct Postgres {
         env_vars: HashMap<String, String>,
         copy_to_sources: Vec<CopyToContainer>,
-        cmd: Vec<String>,
-        fsync_enabled: bool,
+        ssl: bool,
+        ca_mount: Mount,
+        cert_mount: Mount,
+        key_mount: Mount,
     }
 
     impl Postgres {
-        /// Set `method` as default auth method for any host/db/user,
-        /// it adds the following line to the end of the `pg_hba.conf`:
-        /// ```host all all all {method}"```
-        pub fn with_auth_method(mut self, method: &str) -> Self {
-            self.env_vars
-                .insert("POSTGRES_HOST_AUTH_METHOD".to_owned(), method.to_owned());
-            self
-        }
-
         /// Sets the db name for the Postgres instance.
         pub fn with_db_name(mut self, db_name: &str) -> Self {
             self.env_vars
@@ -201,25 +248,6 @@ mod images {
             self
         }
 
-        /// Registers sql to be executed automatically when the container starts.
-        /// Can be called multiple times to add (not override) scripts.
-        ///
-        /// # Example
-        ///
-        /// ```
-        /// # use testcontainers_modules::postgres::Postgres;
-        /// let postgres_image = Postgres::default().with_init_sql(
-        ///     "CREATE EXTENSION IF NOT EXISTS hstore;"
-        ///         .to_string()
-        ///         .into_bytes(),
-        /// );
-        /// ```
-        ///
-        /// ```rust,ignore
-        /// # use testcontainers_modules::postgres::Postgres;
-        /// let postgres_image = Postgres::default()
-        ///                                .with_init_sql(include_str!("path_to_init.sql").to_string().into_bytes());
-        /// ```
         pub fn with_init_sql(mut self, init_sql: impl Into<CopyDataSource>) -> Self {
             let target = format!(
                 "/docker-entrypoint-initdb.d/init_{i}.sql",
@@ -230,48 +258,19 @@ mod images {
             self
         }
 
-        /// Enable SSL on server and copy certificates to config folder
-        pub fn with_ssl_enabled(
-            mut self,
-            ca_cert: impl Into<CopyDataSource>,
-            server_cert: impl Into<CopyDataSource>,
-            server_key: impl Into<CopyDataSource>,
-        ) -> Self {
-            const SSL_CMDS: [&str; 8] = [
-                "-c",
-                "ssl=on",
-                "-c",
-                "ssl_ca_file=ca.pem",
-                "-c",
-                "ssl_cert_file=server.crt",
-                "-c",
-                "ssl_key_file=server.key",
-            ];
-
-            self.copy_to_sources.push(CopyToContainer::new(
-                ca_cert.into(),
-                "/var/lib/postgresql/data/ca.pem".to_owned(),
-            ));
-            self.copy_to_sources.push(CopyToContainer::new(
-                server_cert.into(),
-                "/var/lib/postgresql/data/server.crt".to_owned(),
-            ));
-            self.copy_to_sources.push(CopyToContainer::new(
-                server_key.into(),
-                "/var/lib/postgresql/data/server.key".to_owned(),
-            ));
-
-            SSL_CMDS
-                .into_iter()
-                .map(String::from)
-                .for_each(|s| self.cmd.push(s));
-
+        pub fn with_init_sh(mut self, init_sh: impl Into<CopyDataSource>) -> Self {
+            let target = format!(
+                "/docker-entrypoint-initdb.d/init_{i}.sh",
+                i = self.copy_to_sources.len()
+            );
+            self.copy_to_sources
+                .push(CopyToContainer::new(init_sh.into(), target));
             self
         }
 
-        /// Enables [the fsync-setting](https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-FSYNC) for the Postgres instance.
-        pub fn with_fsync_enabled(mut self) -> Self {
-            self.fsync_enabled = true;
+        /// Enable SSL on server and copy certificates to config folder
+        pub fn with_ssl_enabled(mut self) -> Self {
+            self.ssl = true;
             self
         }
     }
@@ -283,11 +282,27 @@ mod images {
             env_vars.insert("POSTGRES_USER".to_owned(), "postgres".to_owned());
             env_vars.insert("POSTGRES_PASSWORD".to_owned(), "postgres".to_owned());
 
+            let cargo_folder = env::var("CARGO_MANIFEST_DIR").unwrap();
+
             Self {
                 env_vars,
                 copy_to_sources: Vec::new(),
-                cmd: Vec::new(),
-                fsync_enabled: false,
+                ssl: false,
+                ca_mount: Mount::bind_mount(
+                    format!("{cargo_folder}/tests/tls/ca.pem"),
+                    "/certs/ca.pem",
+                )
+                .with_access_mode(AccessMode::ReadOnly),
+                cert_mount: Mount::bind_mount(
+                    format!("{cargo_folder}/tests/tls/server.crt"),
+                    "/certs/server.crt",
+                )
+                .with_access_mode(AccessMode::ReadOnly),
+                key_mount: Mount::bind_mount(
+                    format!("{cargo_folder}/tests/tls/server.key"),
+                    "/certs/server.key",
+                )
+                .with_access_mode(AccessMode::ReadOnly),
             }
         }
     }
@@ -320,14 +335,33 @@ mod images {
         }
 
         fn cmd(&self) -> impl IntoIterator<Item = impl Into<std::borrow::Cow<'_, str>>> {
-            let mut cmd: Vec<&str> = self.cmd.iter().map(String::as_str).collect();
-
-            if !self.fsync_enabled {
+            let mut cmd = vec![];
+            if self.ssl {
                 cmd.push("-c");
-                cmd.push("fsync=off");
+                cmd.push("ssl=on");
+                cmd.push("-c");
+                cmd.push("ssl_ca_file=/certs/ca.pem");
+                cmd.push("-c");
+                cmd.push("ssl_cert_file=/certs/server.crt");
+                cmd.push("-c");
+                cmd.push("ssl_key_file=/certs/server.key");
             }
 
             cmd
         }
+
+        fn mounts(&self) -> impl IntoIterator<Item = &Mount> {
+            if self.ssl {
+                vec![&self.ca_mount, &self.cert_mount, &self.key_mount]
+            } else {
+                vec![]
+            }
+        }
     }
+}
+
+#[tokio::test]
+async fn test_start_psql_server() {
+    let port = init_psql_server().await;
+    assert!(port > 0);
 }
