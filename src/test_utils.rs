@@ -150,9 +150,9 @@ static PSQL_CONTAINER: OnceCell<ContainerAsync<images::Postgres>> = OnceCell::co
 
 pub async fn init_psql_server() -> u16 {
     init_tracing().await;
-    init_certs("localhost", "exporter", "tests/tls")
-        .await
-        .unwrap();
+    // init_certs("localhost", "exporter", "tests/tls")
+    //     .await
+    //     .unwrap();
 
     let port = psql_server_container()
         .await
