@@ -179,7 +179,7 @@ async fn psql_server_container() -> &'static ContainerAsync<images::Postgres> {
                 // .with_init_sql(Path::new("tests/init/init_db.sql"))
                 // .with_init_sh(Path::new("tests/init/init_conf.sh"))
                 // .with_ssl_enabled()
-                // .with_container_name("test-psql-query-exporter")
+                .with_container_name("test-psql-query-exporter")
                 .start()
                 .await
                 .unwrap()
