@@ -139,7 +139,7 @@ impl TestTlsCerts {
             "client.key",
             "ca.pem",
         ] {
-            fs::set_permissions(format!("{folder}/{file}"), Permissions::from_mode(0o440)).await?;
+            fs::set_permissions(format!("{folder}/{file}"), Permissions::from_mode(0o400)).await?;
         }
 
         Ok(())
@@ -291,18 +291,17 @@ mod images {
                 ca_mount: Mount::bind_mount(
                     format!("{cargo_folder}/tests/tls/ca.pem"),
                     "/certs/ca.pem",
-                )
-                .with_access_mode(AccessMode::ReadOnly),
+                ),
+                // .with_access_mode(AccessMode::ReadOnly),
                 cert_mount: Mount::bind_mount(
                     format!("{cargo_folder}/tests/tls/server.crt"),
                     "/certs/server.crt",
-                )
-                .with_access_mode(AccessMode::ReadOnly),
+                ),
+                // .with_access_mode(AccessMode::ReadOnly),
                 key_mount: Mount::bind_mount(
                     format!("{cargo_folder}/tests/tls/server.key"),
                     "/certs/server.key",
-                )
-                .with_access_mode(AccessMode::ReadOnly),
+                ), // .with_access_mode(AccessMode::ReadOnly),
             }
         }
     }
