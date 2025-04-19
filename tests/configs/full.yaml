@@ -1,0 +1,152 @@
+defaults:
+  scrape_interval: 20s
+  query_timeout: 2s
+  metric_prefix: test_metrics_prefix
+  sslmode: verify-ca
+  sslrootcert: tests/tls/ca.pem
+  sslcert: tests/tls/client.crt
+  sslkey: test/tls/client.key
+  metric_expiration_time: 1h
+  backoff_interval: 5s
+  max_backoff_interval: 100s
+
+sources:
+  source_name_1:
+    host: "host1.com"
+    port: 5432
+    user: "user1"
+    password: "EXPOSED_PG_PASSWORD"
+    sslmode: prefer
+    scrape_interval: 1m
+    query_timeout: 10s
+    metric_expiration_time: 2h
+    backoff_interval: 20s
+    max_backoff_interval: 300s
+    metric_prefix: "source1_prefix"
+
+    databases:
+      - dbname: "s1db1"
+        queries:
+          - query: "SELECT label1, label2, field1 from table1"
+            description: "s1db1 test metric"
+            metric_name: "s1db1_test_metric"
+
+            const_labels:
+              label1: label_value1
+              label2: label_value2
+
+            var_labels:
+              - label1
+              - label2
+
+            values:
+              single:
+                field: field1
+                type: int
+
+      - dbname: "s1db2"
+        queries:
+          - query: "SELECT label1, label2, field1 from table2"
+            description: "s1db2 test metric"
+            metric_name: "s1db2_test_metric"
+            values:
+              single:
+                field: field1
+                type: float
+
+      - dbname: "s1db3"
+        queries:
+          - query: "SELECT field`` from table2"
+            description: "s1db3 test metric"
+            metric_name: "s1db3_test_metric"
+            metric_prefix: null
+
+  source_name_2:
+    host: "host2.com"
+    port: 4321
+    user: "user2"
+    password: "EXPOSED_PG_PASSWORD_2"
+    sslmode: disable
+    scrape_interval: 30m
+    query_timeout: 10s
+    metric_expiration_time: 10s
+    backoff_interval: 10s
+    max_backoff_interval: 300s
+    metric_prefix: source2_prefix
+
+    databases:
+      - dbname: "s2db1"
+        scrape_interval: 30m
+        query_timeout: 10s
+        metric_expiration_time: 20s
+        backoff_interval: 10s
+        max_backoff_interval: 300s
+
+        queries:
+          - query: "select label1, label2, sount(*) as field2, sum(field3) as field3 from table3"
+            description: ""
+            metric_name: "s2db1_two_fileds_multi_labels_values"
+            scrape_interval: 30m
+            query_timeout: 10s
+            metric_expiration_time: 30s
+            metric_prefix: ""
+
+            const_labels:
+              label1: label_value1
+              label2: label_value2
+
+            var_labels:
+              - label1
+              - label2
+
+            values:
+              multi_labels:
+                - field: field2
+                  type: int
+                  labels:
+                    multi_label1: multi_label_value1
+                    multi_label2: multi_label_value2
+                - field: field3
+                  type: float
+                  labels:
+                    multi_label1: multi_label_value1
+                    multi_label3: multi_label_value3
+
+  source_name_3:
+    host: "host3.com"
+    user: "user3"
+    password: "EXPOSED_PG_PASSWORD"
+    sslmode: verify-full
+    sslrootcert: tests/tls/overriden/ca.pem
+    sslcert: tests/tls/overriden/client.crt
+    sslkey: test/tls/overriden/client.key
+
+    databases:
+      - dbname: "s3db1"
+        metric_prefix: "s3db1_metrics_prefix"
+
+        queries:
+          - query: "select * from table4"
+            metric_name: multi_suffixes_metric_name
+            description: "multi suffixes metric"
+            scrape_interval: 1s
+            query_timeout: 1s
+            metric_expiration_time: 5s
+            metric_prefix: "multi_suffixes_metric_prefix"
+
+            const_labels:
+              label3: label_value3
+              label4: label_value4
+
+            var_labels:
+              - label5
+              - label6
+
+            values:
+              multi_suffixes:
+                - field: field4
+                  type: int
+                  suffix: suffix1
+                - field: field5
+                  type: float
+                  suffix: suffix2

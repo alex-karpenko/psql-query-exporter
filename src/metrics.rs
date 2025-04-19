@@ -1,14 +1,15 @@
-use crate::db::{PostgresConnection, PostgresSslCertificates};
-use crate::errors::PsqlExporterError;
-use crate::scrape_config::{
+use crate::config::{
     FieldType, ScrapeConfig, ScrapeConfigDatabase, ScrapeConfigQuery, ScrapeConfigValues,
 };
+use crate::db::{PostgresConnection, PostgresSslCertificates};
+use crate::errors::PsqlExporterError;
 use crate::utils::{ShutdownReceiver, SleepHelper};
 use human_repr::HumanDuration;
 use prometheus::core::{AtomicF64, AtomicI64, Collector, GenericGauge, GenericGaugeVec};
 use prometheus::{
     opts, Encoder, Gauge, GaugeVec, IntGauge, IntGaugeVec, Opts, Registry, TextEncoder,
 };
+use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
 use tokio::sync::mpsc;
 use tokio_postgres::Row;
@@ -52,7 +53,9 @@ impl QueryMetrics {
                 );
 
                 if let Some(const_labels) = &query_config.const_labels {
-                    opts = opts.const_labels(const_labels.clone());
+                    let const_labels: HashMap<String, String> =
+                        const_labels.clone().into_iter().collect();
+                    opts = opts.const_labels(const_labels);
                 }
 
                 let new_metric =
@@ -75,7 +78,9 @@ impl QueryMetrics {
                     );
 
                     if let Some(const_labels) = &query_config.const_labels {
-                        let mut const_labels = const_labels.clone();
+                        let mut const_labels: HashMap<String, String> =
+                            const_labels.clone().into_iter().collect();
+
                         value.labels.iter().for_each(|(k, v)| {
                             const_labels.insert(k.to_string(), v.to_string());
                         });
@@ -108,7 +113,9 @@ impl QueryMetrics {
                     let mut opts = opts!(metric_name, metric_desc);
 
                     if let Some(const_labels) = &query_config.const_labels {
-                        opts = opts.const_labels(const_labels.clone());
+                        let const_labels: HashMap<String, String> =
+                            const_labels.clone().into_iter().collect();
+                        opts = opts.const_labels(const_labels);
                     }
                     let new_metric = Self::helper_create_metric(
                         &query_config.var_labels,
@@ -185,8 +192,7 @@ impl QueryMetrics {
 }
 
 #[instrument("ComposeReply")]
-pub async fn compose_reply() -> String {
-    let registry = prometheus::default_registry();
+pub async fn compose_reply(registry: Registry) -> String {
     debug!(?registry, "preparing metrics");
 
     let mut buffer = vec![];
@@ -196,60 +202,75 @@ pub async fn compose_reply() -> String {
         .encode(&metric_families, &mut buffer)
         .unwrap_or_else(|e| panic!("looks like a BUG: {e}"));
 
+    if buffer.is_empty() {
+        warn!("no metrics found");
+        return String::from("# no metrics found\n");
+    }
+
     String::from_utf8(buffer).unwrap_or_else(|e| panic!("looks like a BUG: {e}"))
 }
 
-#[instrument("CollectorTask", skip_all)]
-pub async fn collecting_task(
+#[instrument("CollectorsTask", skip_all)]
+pub async fn collectors_task(
     scrape_config: ScrapeConfig,
+    registry: Registry,
     shutdown_channel: ShutdownReceiver,
 ) -> Result<(), PsqlExporterError> {
     debug!(config = ?scrape_config);
 
-    let mut handler_index: usize = 0;
-    let (tx, mut rx) = mpsc::channel(scrape_config.len());
-    let sources = scrape_config.sources;
-    for (_, source_db_instance) in sources {
-        let databases = source_db_instance.databases;
-        for database in databases {
-            let tx = tx.clone();
-            let shut_rx = shutdown_channel.clone();
-            tokio::spawn(async move {
-                let handler_result = collect_one_db_instance(database, shut_rx).await;
-                let send_result = tx
-                    .send(handler_index)
-                    .await
-                    .map_err(PsqlExporterError::MetricsBackStatusSend);
+    if scrape_config.is_empty() {
+        warn!("no sources configured, waiting for shutdown signal");
+        let mut rx = shutdown_channel.clone();
+        rx.changed()
+            .await
+            .map_err(|_| PsqlExporterError::ShutdownSignalReceived)?;
+    } else {
+        let mut handler_index: usize = 0;
+        let (tx, mut rx) = mpsc::channel(scrape_config.len());
+        let sources = scrape_config.sources;
+        for (_, source_db_instance) in sources {
+            let databases = source_db_instance.databases;
+            for database in databases {
+                let tx = tx.clone();
+                let shut_rx = shutdown_channel.clone();
+                let registry = registry.clone();
+                tokio::spawn(async move {
+                    let handler_result = collect_one_db_instance(database, registry, shut_rx).await;
+                    let send_result = tx
+                        .send(handler_index)
+                        .await
+                        .map_err(PsqlExporterError::MetricsBackStatusSend);
 
-                if let Err(result) = handler_result {
-                    match result {
-                        PsqlExporterError::ShutdownSignalReceived => {
-                            debug!(task = %handler_index, "completed due to shutdown signal");
-                            Ok(())
+                    if let Err(result) = handler_result {
+                        match result {
+                            PsqlExporterError::ShutdownSignalReceived => {
+                                debug!(task = %handler_index, "completed due to shutdown signal");
+                                Ok(())
+                            }
+                            _ => {
+                                error!(task = %handler_index, error=%result, "completed unexpectedly");
+                                Err(result)
+                            }
                         }
-                        _ => {
-                            error!(task = %handler_index, error=%result, "completed unexpectedly");
-                            Err(result)
-                        }
+                    } else if let Err(result) = send_result {
+                        Err(result)
+                    } else {
+                        handler_result
                     }
-                } else if let Err(result) = send_result {
-                    Err(result)
-                } else {
-                    handler_result
-                }
-            });
-            handler_index += 1;
+                });
+                handler_index += 1;
+            }
         }
-    }
 
-    debug!(task = %handler_index, "handlers have been started");
+        debug!(task = %handler_index, "handlers have been started");
 
-    while let Some(task_index) = rx.recv().await {
-        debug!(task = %task_index, "completed");
-        handler_index -= 1;
-        if handler_index == 0 {
-            info!("all tasks have been stopped, exiting");
-            return Ok(());
+        while let Some(task_index) = rx.recv().await {
+            debug!(task = %task_index, "completed");
+            handler_index -= 1;
+            if handler_index == 0 {
+                info!("all tasks have been stopped, exiting");
+                return Ok(());
+            }
         }
     }
 
@@ -259,6 +280,7 @@ pub async fn collecting_task(
 #[instrument("CollectSingleDbInstance", skip_all, fields(%database))]
 async fn collect_one_db_instance(
     database: ScrapeConfigDatabase,
+    registry: Registry,
     shutdown_channel: ShutdownReceiver,
 ) -> Result<(), PsqlExporterError> {
     if database.queries.is_empty() {
@@ -279,7 +301,6 @@ async fn collect_one_db_instance(
     )
     .await?;
 
-    let registry = prometheus::default_registry();
     let mut query_metrics: Vec<QueryMetrics> = Vec::with_capacity(database.queries.len());
     let mut sleeper = SleepHelper::from(shutdown_channel.clone());
 
@@ -300,7 +321,7 @@ async fn collect_one_db_instance(
 
             match result {
                 Ok(result) => {
-                    query_metrics[index].register(registry);
+                    query_metrics[index].register(&registry);
                     let update_result = match &query_item.values {
                         ScrapeConfigValues::ValueFrom { single: value } => {
                             if let Some(field) = &value.field {
@@ -366,7 +387,7 @@ async fn collect_one_db_instance(
                             query_metrics[index].last_updated + query_item.metric_expiration_time;
                         if SystemTime::now() > expiration_time {
                             debug!("deregister expired metrics");
-                            query_metrics[index].unregister(registry);
+                            query_metrics[index].unregister(&registry);
                         }
                     }
                     error!("{e}")

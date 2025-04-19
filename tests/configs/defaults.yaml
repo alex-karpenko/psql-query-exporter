@@ -1,0 +1,13 @@
+defaults:
+  scrape_interval: 5s
+  query_timeout: 1s
+  metric_prefix: test_metrics_prefix
+  sslmode: verify-ca
+  sslrootcert: tests/tls/ca.pem
+  sslcert: tests/tls/client.crt
+  sslkey: test/tls/client.key
+  metric_expiration_time: 120s
+  backoff_interval: 1s
+  max_backoff_interval: 3s
+
+sources: {}

@@ -1,0 +1,16 @@
+---
+source: src/config.rs
+description: "config file: empty"
+---
+defaults:
+  scrape_interval: 30m
+  query_timeout: 10s
+  backoff_interval: 10s
+  max_backoff_interval: 5m
+  metric_expiration_time: 0s
+  metric_prefix: ~
+  sslrootcert: ~
+  sslcert: ~
+  sslkey: ~
+  sslmode: prefer
+sources: {}

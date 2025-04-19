@@ -1,0 +1,26 @@
+sources:
+  source_name_with_envs:
+    host: "${TEST_PG_HOST}"
+    port: ${TEST_PG_PORT}
+    user: "${TEST_PG_USER}"
+    password: "${TEST_PG_PASSWORD}"
+    sslmode: verify-full
+    sslrootcert: ${TEST_PG_SSLROOTCERT}
+    sslcert: ${TEST_PG_SSLCERT}
+    sslkey: ${TEST_PG_SSLKEY}
+    scrape_interval: 30m
+    query_timeout: 10s
+    metric_expiration_time: 0s
+    backoff_interval: 10s
+    max_backoff_interval: 300s
+    metric_prefix: ""
+
+    databases:
+      - dbname: test_db_name
+        queries:
+          - query: "SELECT * FROM TEST"
+            metric_name: "env_test_metric"
+            values:
+              single:
+                field: field1
+                type: int
