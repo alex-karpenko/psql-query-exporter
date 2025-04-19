@@ -8,7 +8,7 @@ use std::{
     path::Path,
     sync::atomic::{AtomicU16, Ordering},
 };
-use testcontainers::{runners::AsyncRunner, ContainerAsync, ImageExt};
+use testcontainers::{core::IntoContainerPort, runners::AsyncRunner, ContainerAsync, ImageExt};
 use tokio::{fs, sync::OnceCell};
 use tracing::info;
 
@@ -179,6 +179,7 @@ async fn psql_server_container() -> &'static ContainerAsync<images::Postgres> {
                 .with_init_sql(Path::new("tests/init/init_db.sql"))
                 .with_init_sh(Path::new("tests/init/init_conf.sh"))
                 .with_ssl_enabled()
+                .with_mapped_port(5432, 5432u16.tcp())
                 .with_container_name("test-psql-query-exporter")
                 .start()
                 .await
