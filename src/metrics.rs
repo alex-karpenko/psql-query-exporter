@@ -517,10 +517,7 @@ mod tests {
     #[case("multi_labels", 2)]
     #[case("multi_suffixes", 2)]
     #[tokio::test]
-    async fn test_collect_one_db_instance_single_basic(
-        #[case] case_name: &str,
-        #[case] number_of_updates: usize,
-    ) {
+    async fn test_collectors_task(#[case] case_name: &str, #[case] number_of_updates: usize) {
         use insta::with_settings;
         use tokio::fs;
 

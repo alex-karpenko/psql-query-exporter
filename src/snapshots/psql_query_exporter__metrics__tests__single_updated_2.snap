@@ -1,6 +1,6 @@
 ---
 source: src/metrics.rs
-description: "collector test case 'single', after update 1"
+description: "collector test case 'single', after update 2"
 ---
 # HELP single_with_const_labels single_with_const_labels
 # TYPE single_with_const_labels gauge
