@@ -11,6 +11,12 @@ pub const TEST_DB_NAME: &str = "exporter";
 pub const TEST_DB_USER: &str = "exporter";
 pub const TEST_DB_PASSWORD: &str = "test-exporter-password";
 
+pub const TEST_CA_CERT: &str = "tests/tls/ca.pem";
+pub const TEST_CLIENT_CERT: &str = "tests/tls/client.crt";
+pub const TEST_CLIENT_KEY: &str = "tests/tls/client.key";
+pub const TEST_SERVER_CERT: &str = "tests/tls/server.crt";
+pub const TEST_SERVER_KEY: &str = "tests/tls/server.key";
+
 pub fn next_addr() -> SocketAddr {
     static PORT: AtomicU16 = AtomicU16::new(9000);
 
@@ -64,6 +70,7 @@ async fn psql_server_container() -> &'static ContainerAsync<images::Postgres> {
 }
 
 mod images {
+    use super::*;
     use std::{borrow::Cow, collections::HashMap, env};
     use testcontainers::{
         core::{AccessMode, Mount, WaitFor},
@@ -165,17 +172,17 @@ mod images {
                 copy_to_sources: Vec::new(),
                 ssl: false,
                 ca_mount: Mount::bind_mount(
-                    format!("{cargo_folder}/tests/tls/ca.pem"),
+                    format!("{cargo_folder}/{TEST_CA_CERT}"),
                     "/certs/ca.pem",
                 )
                 .with_access_mode(AccessMode::ReadOnly),
                 cert_mount: Mount::bind_mount(
-                    format!("{cargo_folder}/tests/tls/server.crt"),
+                    format!("{cargo_folder}/{TEST_SERVER_CERT}"),
                     "/certs/server.crt",
                 )
                 .with_access_mode(AccessMode::ReadOnly),
                 key_mount: Mount::bind_mount(
-                    format!("{cargo_folder}/tests/tls/server.key"),
+                    format!("{cargo_folder}/{TEST_SERVER_KEY}"),
                     "/certs/server.key",
                 )
                 .with_access_mode(AccessMode::ReadOnly),

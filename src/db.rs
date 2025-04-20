@@ -88,7 +88,7 @@ pub struct PostgresConnection {
     shutdown_channel: ShutdownReceiver,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
 pub enum PostgresSslMode {
     Disable,
@@ -366,8 +366,10 @@ impl PostgresConnection {
 mod tests {
     use super::*;
     use crate::test_utils::{
-        init_psql_server, init_tracing, TEST_DB_NAME, TEST_DB_PASSWORD, TEST_DB_USER,
+        init_psql_server, init_tracing, TEST_CA_CERT, TEST_CLIENT_CERT, TEST_CLIENT_KEY,
+        TEST_DB_NAME, TEST_DB_PASSWORD, TEST_DB_USER,
     };
+    use rstest::rstest;
 
     async fn create_test_connection_string(sslmode: PostgresSslMode) -> PostgresConnectionString {
         init_tracing().await;
@@ -415,17 +417,40 @@ mod tests {
             conn_string.to_string(),
             format!("host=localhost port=4321 dbname=XXXXXXXX user=YYYYYYYY password='***' sslmode=prefer application_name={}-v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
         );
+        assert_eq!(
+            format!("{:?}", conn_string),
+            format!("host=localhost port=4321 dbname=XXXXXXXX user=YYYYYYYY password='***' sslmode=prefer application_name={}-v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
+        );
     }
 
+    #[rstest]
+    #[case(PostgresSslMode::Disable, None, None, None)]
+    #[case(PostgresSslMode::Prefer, None, None, None)]
+    #[case(PostgresSslMode::Require, None, None, None)]
+    #[case(PostgresSslMode::Prefer, Some(TEST_CA_CERT.into()), None, None)]
+    #[case(PostgresSslMode::Require, Some(TEST_CA_CERT.into()), None, None)]
+    #[case(PostgresSslMode::VerifyCa, Some(TEST_CA_CERT.into()), None, None)]
+    #[case(PostgresSslMode::VerifyFull, Some(TEST_CA_CERT.into()), None, None)]
+    #[case(PostgresSslMode::Prefer, None, Some(TEST_CLIENT_CERT.into()), Some(TEST_CLIENT_KEY.into()))]
+    #[case(PostgresSslMode::Require, None, Some(TEST_CLIENT_CERT.into()), Some(TEST_CLIENT_KEY.into()))]
+    #[case(PostgresSslMode::Prefer, Some(TEST_CA_CERT.into()), Some(TEST_CLIENT_CERT.into()), Some(TEST_CLIENT_KEY.into()))]
+    #[case(PostgresSslMode::Require, Some(TEST_CA_CERT.into()), Some(TEST_CLIENT_CERT.into()), Some(TEST_CLIENT_KEY.into()))]
+    #[case(PostgresSslMode::VerifyCa, Some(TEST_CA_CERT.into()), Some(TEST_CLIENT_CERT.into()), Some(TEST_CLIENT_KEY.into()))]
+    #[case(PostgresSslMode::VerifyFull, Some(TEST_CA_CERT.into()), Some(TEST_CLIENT_CERT.into()), Some(TEST_CLIENT_KEY.into()))]
     #[tokio::test]
-    async fn test_db_connection_query() {
-        let conn_string = create_test_connection_string(PostgresSslMode::Disable).await;
+    async fn test_db_connection_query(
+        #[case] sslmode: PostgresSslMode,
+        #[case] rootcert: Option<String>,
+        #[case] cert: Option<String>,
+        #[case] key: Option<String>,
+    ) {
+        let conn_string = create_test_connection_string(sslmode).await;
         let (_tx, rx) = tokio::sync::watch::channel(false);
 
         let mut connection = PostgresConnection::new(
             conn_string,
-            PostgresSslMode::Disable,
-            PostgresSslCertificates::from(None, None, None).unwrap(),
+            sslmode,
+            PostgresSslCertificates::from(rootcert, cert, key).unwrap(),
             Duration::from_secs(1),
             Duration::from_secs(5),
             rx,
