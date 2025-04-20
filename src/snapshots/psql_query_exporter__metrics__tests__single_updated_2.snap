@@ -1,0 +1,24 @@
+---
+source: src/metrics.rs
+description: "collector test case 'single', after update 1"
+---
+# HELP single_with_const_labels single_with_const_labels
+# TYPE single_with_const_labels gauge
+single_with_const_labels{label_key_1="const_label_value_1"} 3
+# HELP single_with_expiration single_with_expiration
+# TYPE single_with_expiration gauge
+single_with_expiration 3
+# HELP single_with_var_labels single_with_var_labels
+# TYPE single_with_var_labels gauge
+single_with_var_labels{name="Jack"} 3
+single_with_var_labels{name="Jane"} 2
+single_with_var_labels{name="John"} 1
+single_with_var_labels{name="Ten"} 10
+single_with_var_labels{name="Thirteen"} 13
+single_with_var_labels{name="Twelve"} 12
+# HELP single_without_labels single_without_labels
+# TYPE single_without_labels gauge
+single_without_labels 3
+# HELP single_without_labels_with_desc single basic with description
+# TYPE single_without_labels_with_desc gauge
+single_without_labels_with_desc 3

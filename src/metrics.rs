@@ -490,30 +490,98 @@ fn update_metrics(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_utils::{init_psql_server, init_tracing, TEST_DB_PASSWORD, TEST_DB_USER};
+    use crate::{
+        db::PostgresSslMode,
+        test_utils::{
+            create_test_connection_string, init_psql_server, init_tracing, TEST_DB_PASSWORD,
+            TEST_DB_USER,
+        },
+    };
     use insta::assert_snapshot;
     use prometheus::Registry;
+    use rstest::rstest;
     use std::env;
     use tokio::sync::watch;
 
+    #[rstest]
+    #[case("single", 2)]
     #[tokio::test]
-    async fn test_collect_one_db_instance_single_basic() {
+    async fn test_collect_one_db_instance_single_basic(
+        #[case] case_name: &str,
+        #[case] number_of_updates: usize,
+    ) {
+        use insta::with_settings;
+        use tokio::fs;
+
         init_tracing().await;
         let port = init_psql_server().await;
 
         let registry = Registry::new();
         let (tx, rx) = watch::channel(false);
 
+        // Configure collectors task
         env::set_var("TEST_PG_PORT", format!("{port}"));
         env::set_var("TEST_PG_USER", TEST_DB_USER);
         env::set_var("TEST_PG_PASSWORD", TEST_DB_PASSWORD);
 
-        let config = ScrapeConfig::from_file(&format!("tests/configs/single/basic.yaml")).unwrap();
-        let handler = tokio::spawn(collectors_task(config, registry.clone(), rx));
+        let config =
+            ScrapeConfig::from_file(&format!("tests/cases/{case_name}/config.yaml")).unwrap();
+        let handler = tokio::spawn(collectors_task(config, registry.clone(), rx.clone()));
         tokio::time::sleep(Duration::from_secs(1)).await;
 
+        // Create side db connection to push updates
+        let connection_string = create_test_connection_string(PostgresSslMode::Disable).await;
+        let mut db = PostgresConnection::new(
+            connection_string,
+            PostgresSslMode::Disable,
+            PostgresSslCertificates::from(None, None, None).unwrap(),
+            Duration::from_secs(1),
+            Duration::from_secs(5),
+            rx,
+        )
+        .await
+        .unwrap();
+
+        // Get original data
+        let metrics = compose_reply(registry.clone()).await;
+        with_settings!(
+            { description => format!("collector test case '{}', original data", case_name), omit_expression => true },
+            { assert_snapshot!(format!("{case_name}_original"), metrics) }
+        );
+
+        // Update data
+        for round in 1..=number_of_updates {
+            // get queries string from file
+            let queries = fs::read_to_string(format!("tests/cases/{case_name}/update_{round}.sql"))
+                .await
+                .unwrap();
+            // Split it and filter out empty ones and comments
+            let queries: Vec<&str> = queries
+                .split('\n')
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .filter(|s| !s.starts_with("--"))
+                .collect();
+            // Run queries one by one
+            for query in queries {
+                db.query(&query, Duration::from_secs(1)).await.unwrap();
+            }
+            // Wait for more than 2s for the next scrape round
+            tokio::time::sleep(Duration::from_secs(3)).await;
+            let metrics = compose_reply(registry.clone()).await;
+            with_settings!(
+                { description => format!("collector test case '{}', after update 1", case_name), omit_expression => true },
+                { assert_snapshot!(format!("{case_name}_updated_{round}"), metrics) }
+            );
+        }
+
+        // Wait for expiration
+        tokio::time::sleep(Duration::from_secs(3)).await;
         let metrics = compose_reply(registry).await;
-        assert_snapshot!("single_basic", metrics);
+        with_settings!(
+            { description => format!("collector test case '{}', expired", case_name), omit_expression => true },
+            { assert_snapshot!(format!("{case_name}_expired"), metrics) }
+        );
 
         tx.send(true).unwrap();
         handler.await.unwrap().unwrap();
