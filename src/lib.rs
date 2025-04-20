@@ -81,7 +81,7 @@ mod tests {
     #[case("/health", "healthy\n")]
     #[case("/metrics", "# no metrics found\n")]
     #[tokio::test]
-    async fn test_web_server_root(#[case] path: &str, #[case] expected: &str) {
+    async fn test_web_server(#[case] path: &str, #[case] expected: &str) {
         init_tracing().await;
 
         let addr = next_addr();
