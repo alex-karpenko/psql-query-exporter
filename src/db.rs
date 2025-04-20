@@ -340,7 +340,7 @@ impl PostgresConnection {
         debug!("try to reconnect");
         let new_connection = PostgresConnection::new(
             self.db_connection_string.clone(),
-            self.sslmode.clone(),
+            self.sslmode,
             self.certificates.clone(),
             self.default_backoff_interval,
             self.max_backoff_interval,
@@ -480,8 +480,8 @@ mod tests {
             .unwrap();
 
         assert_eq!(result.len(), 3);
-        for i in 0..3 {
-            assert_eq!(result[i].get::<_, i64>(0), i as i64 + 1);
+        for (i, row) in result.iter().enumerate().take(3) {
+            assert_eq!(row.get::<_, i64>(0), i as i64 + 1);
         }
     }
 }

@@ -332,10 +332,10 @@ impl ScrapeConfigSource {
             },
             sslmode: match self.sslmode {
                 None => {
-                    self.sslmode = Some(defaults.sslmode.clone());
-                    defaults.sslmode.clone()
+                    self.sslmode = Some(defaults.sslmode);
+                    defaults.sslmode
                 }
-                _ => self.sslmode.clone().unwrap(),
+                _ => self.sslmode.unwrap(),
             },
         };
 
@@ -345,7 +345,7 @@ impl ScrapeConfigSource {
                 port: self.port.into(),
                 user: self.user.clone(),
                 password: self.password.clone(),
-                sslmode: self.sslmode.clone().unwrap(),
+                sslmode: self.sslmode.unwrap(),
                 dbname: db.dbname.clone(),
             };
             db.propagate_defaults(&defaults, conn_string);
@@ -439,10 +439,10 @@ impl ScrapeConfigDatabase {
             },
             sslmode: match self.sslmode {
                 None => {
-                    self.sslmode = Some(defaults.sslmode.clone());
-                    defaults.sslmode.clone()
+                    self.sslmode = Some(defaults.sslmode);
+                    defaults.sslmode
                 }
-                _ => self.sslmode.clone().unwrap(),
+                _ => self.sslmode.unwrap(),
             },
         };
 
