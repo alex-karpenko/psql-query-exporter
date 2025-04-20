@@ -422,7 +422,7 @@ async fn collect_one_db_instance(
 
             let slip_duration = SystemTime::now().duration_since(next_query_time).unwrap();
             let slip_duration = slip_duration.human_duration();
-            warn!(sleep = %slip_duration, "overtimed query loop");
+            warn!(sleep = %slip_duration, "over-timed query loop");
         }
 
         sleeper.sleep(sleep_time).await?;
@@ -537,7 +537,7 @@ mod tests {
         let handler = tokio::spawn(collectors_task(config, registry.clone(), rx.clone()));
         tokio::time::sleep(Duration::from_secs(1)).await;
 
-        // Create side db connection to push updates
+        // Create a side db connection to push updates
         let connection_string = create_test_connection_string(PostgresSslMode::Disable).await;
         let mut db = PostgresConnection::new(
             connection_string,
@@ -559,7 +559,7 @@ mod tests {
 
         // Update data
         for round in 1..=number_of_updates {
-            // get queries string from file
+            // get query string from the file
             let queries = fs::read_to_string(format!("tests/cases/{case_name}/update_{round}.sql"))
                 .await
                 .unwrap();
@@ -574,7 +574,7 @@ mod tests {
             for query in queries {
                 db.query(query, Duration::from_secs(1)).await.unwrap();
             }
-            // Wait for more than 2s for the next scrape round
+            // Wait for more than 2 seconds for the next scrape round
             tokio::time::sleep(Duration::from_secs(3)).await;
             let metrics = compose_reply(registry.clone()).await;
             with_settings!(

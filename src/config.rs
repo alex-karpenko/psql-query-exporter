@@ -519,7 +519,7 @@ fn substitute_envs(
 ) -> Result<String, PsqlExporterError> {
     if envsubst::is_templated(input) {
         let result = envsubst::substitute(input, envs)?;
-        // If there variable is still present - error
+        // If the variable is still present, then this is an error
         if envsubst::is_templated(&result) {
             return Err(PsqlExporterError::UndefinedEnvironmentVariables(
                 input.into(),
@@ -596,7 +596,7 @@ mod tests {
         );
 
         assert_eq!(config.len(), len);
-        assert!(config.is_empty() == (len == 0));
+        assert_eq!(config.is_empty(), len == 0);
     }
 
     #[test]
