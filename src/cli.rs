@@ -19,7 +19,7 @@ pub struct CliParams {
     #[clap(short, long, default_value_t = 9090, value_parser = clap::value_parser!(u16).range(1..=65535))]
     pub port: u16,
 
-    /// Path to config file
+    /// Path to the config file
     #[clap(long, short)]
     pub config: String,
 }

@@ -151,7 +151,7 @@ mod images {
             self
         }
 
-        /// Enable SSL on server and copy certificates to config folder
+        /// Enable SSL on the server and copy certificates to the config folder
         pub fn with_ssl_enabled(mut self) -> Self {
             self.ssl = true;
             self
@@ -220,7 +220,7 @@ mod images {
             &self.copy_to_sources
         }
 
-        fn cmd(&self) -> impl IntoIterator<Item = impl Into<std::borrow::Cow<'_, str>>> {
+        fn cmd(&self) -> impl IntoIterator<Item = impl Into<Cow<'_, str>>> {
             let mut cmd = vec![];
             if self.ssl {
                 cmd.push("-c");

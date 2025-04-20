@@ -1,9 +1,5 @@
 #!/bin/sh
 
-# 1 - files prefix
-#     may include path to destination folder
-#     or may be used to generate multiple bundles at the same location
-
 prefix="tests/tls/"
 basedir=$(dirname ${0})
 

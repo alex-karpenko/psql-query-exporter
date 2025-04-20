@@ -323,7 +323,7 @@ impl PostgresConnection {
                         });
                     }
                 } else {
-                    return Ok(result.unwrap());
+                    return Ok(result?);
                 }
             }
 
