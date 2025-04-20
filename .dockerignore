@@ -1,5 +1,4 @@
 target
-docker_tests
 tests
 .git
 .github
@@ -8,6 +7,4 @@ values-*.yaml
 config-*.yaml
 .vscode
 *.pem
-*.crt
-*.key
 src/snapshots
