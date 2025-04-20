@@ -515,7 +515,7 @@ mod tests {
     #[rstest]
     #[case("single", 2)]
     #[case("multi_labels", 2)]
-    // #[case("multi_suffixes", 2)]
+    #[case("multi_suffixes", 2)]
     #[tokio::test]
     async fn test_collect_one_db_instance_single_basic(
         #[case] case_name: &str,
