@@ -1,0 +1,37 @@
+sources:
+  single_basic:
+    host: "localhost"
+    port: ${TEST_PG_PORT}
+    user: ${TEST_PG_USER}
+    password: "${TEST_PG_PASSWORD}"
+    sslmode: disable
+    scrape_interval: 5s
+    query_timeout: 1s
+    metric_expiration_time: 1m
+    backoff_interval: 2s
+    max_backoff_interval: 10s
+    metric_prefix: single_basic
+
+    databases:
+      - dbname: exporter
+        queries:
+          - query: select count(*) from basics;
+            metric_name: without_labels
+          - query: select count(*) from basics;
+            description: single basic with description
+            metric_name: without_labels_with_desc
+          - query: select count(*) from basics;
+            metric_name: with_const_labels
+            const_labels:
+              label_key_1: const_label_value_1
+
+          # - query: select count(*) from basics;
+          #   metric_name: with_labels
+          #   labels:
+          #     - label_name: label_value
+          # - query: select count(*) from basics;
+          #   metric_name: with_labels_and_const_labels
+          #   labels:
+          #     - label_name: label_value
+          #   const_labels:
+          #     const_label: const_label_value

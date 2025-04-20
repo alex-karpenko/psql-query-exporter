@@ -365,25 +365,8 @@ impl PostgresConnection {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_utils::{
-        init_psql_server, init_tracing, TEST_CA_CERT, TEST_CLIENT_CERT, TEST_CLIENT_KEY,
-        TEST_DB_NAME, TEST_DB_PASSWORD, TEST_DB_USER,
-    };
+    use crate::test_utils::{TEST_CA_CERT, TEST_CLIENT_CERT, TEST_CLIENT_KEY};
     use rstest::rstest;
-
-    async fn create_test_connection_string(sslmode: PostgresSslMode) -> PostgresConnectionString {
-        init_tracing().await;
-        let port = init_psql_server().await;
-
-        PostgresConnectionString {
-            host: "localhost".to_string(),
-            port,
-            dbname: TEST_DB_NAME.to_string(),
-            user: TEST_DB_USER.to_string(),
-            password: TEST_DB_PASSWORD.to_string(),
-            sslmode,
-        }
-    }
 
     #[test]
     fn test_db_connection_string_format() {
@@ -444,6 +427,8 @@ mod tests {
         #[case] cert: Option<String>,
         #[case] key: Option<String>,
     ) {
+        use crate::test_utils::create_test_connection_string;
+
         let conn_string = create_test_connection_string(sslmode).await;
         let (_tx, rx) = tokio::sync::watch::channel(false);
 

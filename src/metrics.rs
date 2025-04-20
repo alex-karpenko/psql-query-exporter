@@ -486,3 +486,36 @@ fn update_metrics(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_utils::{init_psql_server, init_tracing, TEST_DB_PASSWORD, TEST_DB_USER};
+    use insta::assert_snapshot;
+    use prometheus::Registry;
+    use std::env;
+    use tokio::sync::watch;
+
+    #[tokio::test]
+    async fn test_collect_one_db_instance_single_basic() {
+        init_tracing().await;
+        let port = init_psql_server().await;
+
+        let registry = Registry::new();
+        let (tx, rx) = watch::channel(false);
+
+        env::set_var("TEST_PG_PORT", format!("{port}"));
+        env::set_var("TEST_PG_USER", TEST_DB_USER);
+        env::set_var("TEST_PG_PASSWORD", TEST_DB_PASSWORD);
+
+        let config = ScrapeConfig::from_file(&format!("tests/configs/single/basic.yaml")).unwrap();
+        let handler = tokio::spawn(collectors_task(config, registry.clone(), rx));
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        let metrics = compose_reply(registry).await;
+        assert_snapshot!("single_basic", metrics);
+
+        tx.send(true).unwrap();
+        handler.await.unwrap().unwrap();
+    }
+}

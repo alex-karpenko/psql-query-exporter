@@ -7,6 +7,8 @@ use testcontainers::{runners::AsyncRunner, ContainerAsync, ImageExt};
 use tokio::sync::OnceCell;
 use tracing::info;
 
+use crate::db::{PostgresConnectionString, PostgresSslMode};
+
 pub const TEST_DB_NAME: &str = "exporter";
 pub const TEST_DB_USER: &str = "exporter";
 pub const TEST_DB_PASSWORD: &str = "test-exporter-password";
@@ -70,6 +72,20 @@ async fn psql_server_container() -> &'static ContainerAsync<images::Postgres> {
                 .unwrap()
         })
         .await
+}
+
+pub async fn create_test_connection_string(sslmode: PostgresSslMode) -> PostgresConnectionString {
+    init_tracing().await;
+    let port = init_psql_server().await;
+
+    PostgresConnectionString {
+        host: "localhost".to_string(),
+        port,
+        dbname: TEST_DB_NAME.to_string(),
+        user: TEST_DB_USER.to_string(),
+        password: TEST_DB_PASSWORD.to_string(),
+        sslmode,
+    }
 }
 
 mod images {

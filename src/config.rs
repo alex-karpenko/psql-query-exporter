@@ -115,7 +115,7 @@ impl From<TcpPort> for u16 {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct ScrapeConfigDatabase {
     pub dbname: String,
@@ -141,7 +141,7 @@ pub struct ScrapeConfigDatabase {
     pub queries: Vec<ScrapeConfigQuery>,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct ScrapeConfigQuery {
     pub query: String,
@@ -162,7 +162,7 @@ pub struct ScrapeConfigQuery {
     pub values: ScrapeConfigValues,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, untagged)]
 pub enum ScrapeConfigValues {
     #[serde(rename = "single")]
@@ -175,7 +175,7 @@ pub enum ScrapeConfigValues {
     },
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct FieldWithType {
     pub field: Option<String>,
@@ -183,7 +183,7 @@ pub struct FieldWithType {
     pub field_type: FieldType,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct FieldWithLabels {
     pub field: String,
@@ -192,7 +192,7 @@ pub struct FieldWithLabels {
     pub labels: BTreeMap<String, String>,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct FieldWithSuffix {
     pub field: String,
@@ -201,7 +201,7 @@ pub struct FieldWithSuffix {
     pub suffix: String,
 }
 
-#[derive(Deserialize, Serialize, Debug, Default)]
+#[derive(Deserialize, Serialize, Debug, Default, Clone)]
 #[serde(deny_unknown_fields, rename_all = "lowercase")]
 pub enum FieldType {
     #[default]
@@ -534,6 +534,7 @@ fn substitute_envs(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use insta::assert_yaml_snapshot;
     use insta::with_settings;
     use rstest::rstest;
 
@@ -579,8 +580,6 @@ mod tests {
     #[case("envs", 1)]
     #[case("full", 3)]
     fn test_scrape_config_parsing(#[case] name: &str, #[case] len: usize) {
-        use insta::assert_yaml_snapshot;
-
         env::set_var("TEST_PG_HOST", "host.from.env.com");
         env::set_var("TEST_PG_PORT", "54321");
         env::set_var("TEST_PG_USER", "user_from_env");

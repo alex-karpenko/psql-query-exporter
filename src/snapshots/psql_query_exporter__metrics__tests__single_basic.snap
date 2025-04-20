@@ -1,0 +1,13 @@
+---
+source: src/metrics.rs
+expression: metrics
+---
+# HELP single_basic_with_const_labels single_basic_with_const_labels
+# TYPE single_basic_with_const_labels gauge
+single_basic_with_const_labels{label_key_1="const_label_value_1"} 3
+# HELP single_basic_without_labels single_basic_without_labels
+# TYPE single_basic_without_labels gauge
+single_basic_without_labels 3
+# HELP single_basic_without_labels_with_desc single basic with description
+# TYPE single_basic_without_labels_with_desc gauge
+single_basic_without_labels_with_desc 3
