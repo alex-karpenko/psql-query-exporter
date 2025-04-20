@@ -1,0 +1,101 @@
+sources:
+  multi_labels_type:
+    host: "localhost"
+    port: ${TEST_PG_PORT}
+    user: ${TEST_PG_USER}
+    password: "${TEST_PG_PASSWORD}"
+    sslmode: disable
+    scrape_interval: 2s
+    query_timeout: 1s
+    metric_expiration_time: 1m
+    backoff_interval: 1s
+    max_backoff_interval: 5s
+    metric_prefix: multi_labels
+
+    databases:
+      - dbname: exporter
+        queries:
+          - query: select sum(int_field)::int8 as int_sum, ceil(sum(float_field))::int8 as float_sum from multi_labels;
+            metric_name: without_common_labels
+            values:
+              multi_labels:
+                - field: int_sum
+                  type: int
+                  labels:
+                    multi_label1: multi_label_value1
+                    multi_label2: multi_label_value2
+                - field: float_sum
+                  type: int
+                  labels:
+                    multi_label1: multi_label_value3
+                    multi_label2: multi_label_value4
+
+          - query: select sum(int_field)::float8 as int_sum, sum(float_field)::float8 as float_sum from multi_labels;
+            description: single basic with description
+            metric_name: without_common_labels_with_desc
+            values:
+              multi_labels:
+                - field: int_sum
+                  type: float
+                  labels:
+                    multi_label1: multi_label_value1
+                    multi_label2: multi_label_value2
+                - field: float_sum
+                  type: float
+                  labels:
+                    multi_label1: multi_label_value3
+                    multi_label2: multi_label_value4
+
+          - query: select sum(int_field)::int8 as int_sum, ceil(sum(float_field))::int8 as float_sum from multi_labels;
+            metric_name: with_const_labels
+            const_labels:
+              const_label_key_1: const_label_value_1
+              const_label_key_2: const_label_value_2
+            values:
+              multi_labels:
+                - field: int_sum
+                  type: int
+                  labels:
+                    multi_label1: multi_label_value1
+                    multi_label2: multi_label_value2
+                - field: float_sum
+                  type: int
+                  labels:
+                    multi_label1: multi_label_value3
+                    multi_label2: multi_label_value4
+
+          - query: >
+              select name,
+                count(*) as cnt,
+                sum(int_field)::int8 as int_sum,
+                ceil(sum(float_field))::int8 as float_sum
+              from multi_labels group by name;
+
+
+            metric_name: with_var_labels
+            var_labels:
+              - name
+            values:
+              multi_labels:
+                - field: cnt
+                  type: int
+                  labels:
+                    type: count
+                - field: int_sum
+                  type: int
+                  labels:
+                    type: int_sum
+                - field: float_sum
+                  type: int
+                  labels:
+                    type: float_sum
+
+          - query: select count(*) as cnt from multi_labels_to_drop;
+            metric_name: with_expiration
+            metric_expiration_time: 5s
+            values:
+              multi_labels:
+                - field: cnt
+                  type: int
+                  labels:
+                    expires_in: 5s

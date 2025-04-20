@@ -1,0 +1,37 @@
+sources:
+  single_type:
+    host: "localhost"
+    port: ${TEST_PG_PORT}
+    user: ${TEST_PG_USER}
+    password: "${TEST_PG_PASSWORD}"
+    sslmode: disable
+    scrape_interval: 2s
+    query_timeout: 1s
+    metric_expiration_time: 1m
+    backoff_interval: 1s
+    max_backoff_interval: 5s
+    metric_prefix: single
+
+    databases:
+      - dbname: exporter
+        queries:
+          - query: select count(*) from single;
+            metric_name: without_labels
+          - query: select count(*) from single;
+            description: single basic with description
+            metric_name: without_labels_with_desc
+          - query: select count(*) from single;
+            metric_name: with_const_labels
+            const_labels:
+              label_key_1: const_label_value_1
+          - query: select * from single;
+            metric_name: with_var_labels
+            var_labels:
+              - name
+            values:
+              single:
+                field: id
+                type: int
+          - query: select count(*) from single_to_drop;
+            metric_name: with_expiration
+            metric_expiration_time: 5s

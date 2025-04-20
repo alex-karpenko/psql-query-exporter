@@ -46,11 +46,11 @@ impl SignalHandler {
         info!(%signal,  "shutting down");
         if let Err(e) = self.shutdown_channel_tx.send(true) {
             error!(error = %e, "can't send shutdown message");
-        };
-
-        debug!("shutdown message has been sent, waiting until all task stopped");
-        self.shutdown_channel_tx.closed().await;
-        info!("shutdown completed");
+        } else {
+            debug!("shutdown message has been sent, waiting until all task stopped");
+            self.shutdown_channel_tx.closed().await;
+            debug!("shutdown completed");
+        }
     }
 
     async fn wait_for_signal(&mut self) -> &str {
@@ -85,5 +85,45 @@ impl SleepHelper {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_sleep_normal_timeout() {
+        let (_tx, rx) = watch::channel(false);
+        let mut helper = SleepHelper::from(rx);
+        let sleep_duration = Duration::from_millis(100);
+
+        select! {
+            result = helper.sleep(sleep_duration) => {
+                assert!(result.is_ok());
+            },
+            _ = tokio::time::sleep(Duration::from_millis(200)) => {
+                panic!("timeout has been reached");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_sleep_shutdown_signal() {
+        let (tx, rx) = watch::channel(false);
+        let mut helper = SleepHelper::from(rx);
+        let sleep_duration = Duration::from_secs(1);
+
+        // Send shutdown signal
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            tx.send(true).unwrap();
+        });
+
+        let result = helper.sleep(sleep_duration).await;
+        assert!(matches!(
+            result,
+            Err(PsqlExporterError::ShutdownSignalReceived)
+        ));
     }
 }

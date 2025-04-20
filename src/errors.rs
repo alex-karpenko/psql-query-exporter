@@ -1,7 +1,7 @@
 use std::io;
 use thiserror::Error;
 
-#[derive(Error)]
+#[derive(Error, Debug)]
 pub enum PsqlExporterError {
     #[error("unable to load config file '{}': {}", .filename, .cause)]
     LoadConfigFile { filename: String, cause: io::Error },
@@ -10,6 +10,8 @@ pub enum PsqlExporterError {
         #[from]
         cause: serde_yaml_ng::Error,
     },
+    #[error("unable to parse config: {0}")]
+    InvalidConfigValue(String),
     #[error("some environment variable(s) not defined: {0}")]
     UndefinedEnvironmentVariables(String),
     #[error("unable to substitute environment variables: {0}")]
@@ -44,10 +46,4 @@ pub enum PsqlExporterError {
     },
     #[error("unable to send task completion status: {}", .0)]
     MetricsBackStatusSend(#[from] tokio::sync::mpsc::error::SendError<usize>),
-}
-
-impl std::fmt::Debug for PsqlExporterError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
-    }
 }

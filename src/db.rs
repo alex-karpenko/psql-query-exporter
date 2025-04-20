@@ -4,7 +4,7 @@ use crate::{
 };
 use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
 use postgres_openssl::MakeTlsConnector;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Debug, Display},
     time::Duration,
@@ -26,15 +26,35 @@ pub struct PostgresConnectionString {
     pub sslmode: PostgresSslMode,
 }
 
+impl PostgresConnectionString {
+    fn format(&self, hide_password: bool) -> String {
+        let password = if hide_password {
+            "***".to_string()
+        } else {
+            self.password.clone()
+        };
+
+        format!(
+            "host={host} port={port} dbname={dbname} user={user} password='{password}' sslmode={sslmode} application_name={DB_APP_NAME}-v{DB_APP_VERSION}",
+            host=self.host,
+            port=self.port,
+            user=self.user,
+            password=password,
+            sslmode=self.sslmode,
+            dbname=self.dbname
+        )
+    }
+}
+
 impl Display for PostgresConnectionString {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "host={host} port={port} dbname={dbname} user={user} password='***' sslmode={sslmode} application_name={DB_APP_NAME}-v{DB_APP_VERSION}", host=self.host, port=self.port, user=self.user, sslmode=self.sslmode, dbname=self.dbname)
+        write!(f, "{}", self.format(true))
     }
 }
 
 impl Debug for PostgresConnectionString {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "host={host} port={port} dbname={dbname} user={user} password='***' sslmode={sslmode} application_name={DB_APP_NAME}-v{DB_APP_VERSION}", host=self.host, port=self.port, user=self.user, sslmode=self.sslmode, dbname=self.dbname)
+        write!(f, "{}", self.format(true))
     }
 }
 
@@ -53,7 +73,7 @@ impl Default for PostgresConnectionString {
 
 impl PostgresConnectionString {
     fn get_conn_string(&self) -> String {
-        format!("host={host} port={port} dbname={dbname} user={user} password='{password}' sslmode={sslmode} application_name={DB_APP_NAME}-v{DB_APP_VERSION}", host=self.host, port=self.port, user=self.user, password=self.password, sslmode=self.sslmode, dbname=self.dbname)
+        self.format(false)
     }
 }
 #[derive(Debug)]
@@ -68,7 +88,7 @@ pub struct PostgresConnection {
     shutdown_channel: ShutdownReceiver,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
 pub enum PostgresSslMode {
     Disable,
@@ -270,7 +290,7 @@ impl PostgresConnection {
         query: &str,
         query_timeout: Duration,
     ) -> Result<Vec<Row>, PsqlExporterError> {
-        debug!(%query);
+        debug!(%query, timeout = ?query_timeout);
 
         let mut backoff_interval = self.default_backoff_interval;
         let mut sleeper = SleepHelper::from(self.shutdown_channel.clone());
@@ -320,7 +340,7 @@ impl PostgresConnection {
         debug!("try to reconnect");
         let new_connection = PostgresConnection::new(
             self.db_connection_string.clone(),
-            self.sslmode.clone(),
+            self.sslmode,
             self.certificates.clone(),
             self.default_backoff_interval,
             self.max_backoff_interval,
@@ -338,6 +358,115 @@ impl PostgresConnection {
                 error!(error = %e);
                 Err(e)
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_utils::{TEST_CA_CERT, TEST_CLIENT_CERT, TEST_CLIENT_KEY};
+    use rstest::rstest;
+
+    #[test]
+    fn test_db_connection_string_format() {
+        let conn_string = PostgresConnectionString {
+            host: "localhost".to_string(),
+            port: 4321,
+            dbname: "XXXXXXXX".to_string(),
+            user: "YYYYYYYY".to_string(),
+            password: "ZZZZZZZ".to_string(),
+            sslmode: PostgresSslMode::Prefer,
+        };
+
+        assert_eq!(
+            conn_string.get_conn_string(),
+            format!("host=localhost port=4321 dbname=XXXXXXXX user=YYYYYYYY password='ZZZZZZZ' sslmode=prefer application_name={}-v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
+        );
+    }
+
+    #[test]
+    fn test_db_connection_string_display() {
+        let conn_string = PostgresConnectionString {
+            host: "localhost".to_string(),
+            port: 4321,
+            dbname: "XXXXXXXX".to_string(),
+            user: "YYYYYYYY".to_string(),
+            password: "ZZZZZZZ".to_string(),
+            sslmode: PostgresSslMode::Prefer,
+        };
+
+        assert_eq!(
+            conn_string.to_string(),
+            format!("host=localhost port=4321 dbname=XXXXXXXX user=YYYYYYYY password='***' sslmode=prefer application_name={}-v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
+        );
+        assert_eq!(
+            format!("{:?}", conn_string),
+            format!("host=localhost port=4321 dbname=XXXXXXXX user=YYYYYYYY password='***' sslmode=prefer application_name={}-v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
+        );
+    }
+
+    #[rstest]
+    #[case(PostgresSslMode::Disable, None, None, None)]
+    #[case(PostgresSslMode::Prefer, None, None, None)]
+    #[case(PostgresSslMode::Require, None, None, None)]
+    #[case(PostgresSslMode::Prefer, Some(TEST_CA_CERT.into()), None, None)]
+    #[case(PostgresSslMode::Require, Some(TEST_CA_CERT.into()), None, None)]
+    #[case(PostgresSslMode::VerifyCa, Some(TEST_CA_CERT.into()), None, None)]
+    #[case(PostgresSslMode::VerifyFull, Some(TEST_CA_CERT.into()), None, None)]
+    #[case(PostgresSslMode::Prefer, None, Some(TEST_CLIENT_CERT.into()), Some(TEST_CLIENT_KEY.into()))]
+    #[case(PostgresSslMode::Require, None, Some(TEST_CLIENT_CERT.into()), Some(TEST_CLIENT_KEY.into()))]
+    #[case(PostgresSslMode::Prefer, Some(TEST_CA_CERT.into()), Some(TEST_CLIENT_CERT.into()), Some(TEST_CLIENT_KEY.into()))]
+    #[case(PostgresSslMode::Require, Some(TEST_CA_CERT.into()), Some(TEST_CLIENT_CERT.into()), Some(TEST_CLIENT_KEY.into()))]
+    #[case(PostgresSslMode::VerifyCa, Some(TEST_CA_CERT.into()), Some(TEST_CLIENT_CERT.into()), Some(TEST_CLIENT_KEY.into()))]
+    #[case(PostgresSslMode::VerifyFull, Some(TEST_CA_CERT.into()), Some(TEST_CLIENT_CERT.into()), Some(TEST_CLIENT_KEY.into()))]
+    #[tokio::test]
+    async fn test_db_connection_query(
+        #[case] sslmode: PostgresSslMode,
+        #[case] rootcert: Option<String>,
+        #[case] cert: Option<String>,
+        #[case] key: Option<String>,
+    ) {
+        use crate::test_utils::create_test_connection_string;
+
+        let conn_string = create_test_connection_string(sslmode).await;
+        let (_tx, rx) = tokio::sync::watch::channel(false);
+
+        let mut connection = PostgresConnection::new(
+            conn_string,
+            sslmode,
+            PostgresSslCertificates::from(rootcert, cert, key).unwrap(),
+            Duration::from_secs(1),
+            Duration::from_secs(5),
+            rx,
+        )
+        .await
+        .unwrap();
+
+        let result = connection
+            .query("SELECT 1;", Duration::from_secs(1))
+            .await
+            .unwrap();
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].get::<_, i32>(0), 1);
+
+        let result = connection
+            .query("SELECT count(1) from basics;", Duration::from_secs(1))
+            .await
+            .unwrap();
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].get::<_, i64>(0), 3);
+
+        let result = connection
+            .query("SELECT id from basics;", Duration::from_secs(1))
+            .await
+            .unwrap();
+
+        assert_eq!(result.len(), 3);
+        for (i, row) in result.iter().enumerate().take(3) {
+            assert_eq!(row.get::<_, i64>(0), i as i64 + 1);
         }
     }
 }

@@ -3,8 +3,13 @@ use crate::{
     errors::PsqlExporterError,
 };
 use core::fmt::Display;
-use serde::Deserialize;
-use std::{collections::HashMap, env, fs::read_to_string, time::Duration};
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::{BTreeMap, HashMap},
+    env,
+    fs::read_to_string,
+    time::Duration,
+};
 
 const DEFAULT_SCRAPE_INTERVAL: Duration = Duration::from_secs(1800);
 const DEFAULT_QUERY_TIMEOUT: Duration = Duration::from_secs(10);
@@ -12,15 +17,15 @@ const DEFAULT_METRIC_EXPIRATION_TIME: Duration = Duration::ZERO;
 const DB_CONNECTION_DEFAULT_BACKOFF_INTERVAL: Duration = Duration::from_secs(10);
 const DB_CONNECTION_MAXIMUM_BACKOFF_INTERVAL: Duration = Duration::from_secs(300);
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ScrapeConfig {
     #[serde(default)]
     defaults: ScrapeConfigDefaults,
-    pub sources: HashMap<String, ScrapeConfigSource>,
+    pub sources: BTreeMap<String, ScrapeConfigSource>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields, default)]
 struct ScrapeConfigDefaults {
     #[serde(with = "humantime_serde")]
@@ -40,12 +45,12 @@ struct ScrapeConfigDefaults {
     sslmode: PostgresSslMode,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ScrapeConfigSource {
     host: String,
-    #[serde(default = "ScrapeConfigSource::default_port")]
-    port: u16,
+    #[serde(default)]
+    port: TcpPort,
     user: String,
     password: String,
     #[serde(default)]
@@ -67,7 +72,50 @@ pub struct ScrapeConfigSource {
     pub databases: Vec<ScrapeConfigDatabase>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[serde(try_from = "String")]
+#[serde(into = "u16")]
+pub struct TcpPort(u16);
+
+impl Default for TcpPort {
+    fn default() -> Self {
+        Self(5432)
+    }
+}
+
+impl TcpPort {
+    fn parse_string_value(s: &String) -> Result<u16, PsqlExporterError> {
+        let s = if envsubst::is_templated(s) {
+            let envs = hashmap_from_envs();
+            &envsubst::substitute(s, &envs)
+                .map_err(|e| PsqlExporterError::InvalidConfigValue(e.to_string()))?
+        } else {
+            s
+        };
+
+        let port: u16 = s
+            .parse()
+            .map_err(|_| PsqlExporterError::InvalidConfigValue(format!("port number: {}", s)))?;
+        Ok(port)
+    }
+}
+
+impl TryFrom<String> for TcpPort {
+    type Error = PsqlExporterError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        let port = Self::parse_string_value(&value)?;
+        Ok(Self(port))
+    }
+}
+
+impl From<TcpPort> for u16 {
+    fn from(value: TcpPort) -> Self {
+        value.0
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct ScrapeConfigDatabase {
     pub dbname: String,
@@ -93,7 +141,7 @@ pub struct ScrapeConfigDatabase {
     pub queries: Vec<ScrapeConfigQuery>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct ScrapeConfigQuery {
     pub query: String,
@@ -107,14 +155,14 @@ pub struct ScrapeConfigQuery {
     #[serde(with = "humantime_serde", default)]
     pub metric_expiration_time: Duration,
     #[serde(default)]
-    pub const_labels: Option<HashMap<String, String>>,
+    pub const_labels: Option<BTreeMap<String, String>>,
     #[serde(default)]
     pub var_labels: Option<Vec<String>>,
     #[serde(default)]
     pub values: ScrapeConfigValues,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, untagged)]
 pub enum ScrapeConfigValues {
     #[serde(rename = "single")]
@@ -127,7 +175,7 @@ pub enum ScrapeConfigValues {
     },
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct FieldWithType {
     pub field: Option<String>,
@@ -135,16 +183,16 @@ pub struct FieldWithType {
     pub field_type: FieldType,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct FieldWithLabels {
     pub field: String,
     #[serde(rename = "type", default)]
     pub field_type: FieldType,
-    pub labels: HashMap<String, String>,
+    pub labels: BTreeMap<String, String>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct FieldWithSuffix {
     pub field: String,
@@ -153,7 +201,7 @@ pub struct FieldWithSuffix {
     pub suffix: String,
 }
 
-#[derive(Deserialize, Debug, Default)]
+#[derive(Deserialize, Serialize, Debug, Default, Clone)]
 #[serde(deny_unknown_fields, rename_all = "lowercase")]
 pub enum FieldType {
     #[default]
@@ -162,9 +210,9 @@ pub enum FieldType {
 }
 
 impl ScrapeConfig {
-    pub fn from(filename: &String) -> Result<ScrapeConfig, PsqlExporterError> {
-        let config = read_to_string(filename).map_err(|e| PsqlExporterError::LoadConfigFile {
-            filename: filename.clone(),
+    pub fn from_file(path: &String) -> Result<ScrapeConfig, PsqlExporterError> {
+        let config = read_to_string(path).map_err(|e| PsqlExporterError::LoadConfigFile {
+            filename: path.clone(),
             cause: e,
         })?;
         let mut config: ScrapeConfig = serde_yaml_ng::from_str(&config)?;
@@ -180,6 +228,10 @@ impl ScrapeConfig {
 
     pub fn len(&self) -> usize {
         self.sources.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.sources.is_empty()
     }
 }
 
@@ -218,10 +270,6 @@ impl ScrapeConfigDefaults {
 }
 
 impl ScrapeConfigSource {
-    fn default_port() -> u16 {
-        5432
-    }
-
     fn propagate_defaults(&mut self, defaults: &ScrapeConfigDefaults) {
         let defaults = ScrapeConfigDefaults {
             scrape_interval: if self.scrape_interval == Duration::default() {
@@ -284,20 +332,20 @@ impl ScrapeConfigSource {
             },
             sslmode: match self.sslmode {
                 None => {
-                    self.sslmode = Some(defaults.sslmode.clone());
-                    defaults.sslmode.clone()
+                    self.sslmode = Some(defaults.sslmode);
+                    defaults.sslmode
                 }
-                _ => self.sslmode.clone().unwrap(),
+                _ => self.sslmode.unwrap(),
             },
         };
 
         self.databases.iter_mut().for_each(|db| {
             let conn_string = PostgresConnectionString {
                 host: self.host.clone(),
-                port: self.port,
+                port: self.port.into(),
                 user: self.user.clone(),
                 password: self.password.clone(),
-                sslmode: self.sslmode.clone().unwrap(),
+                sslmode: self.sslmode.unwrap(),
                 dbname: db.dbname.clone(),
             };
             db.propagate_defaults(&defaults, conn_string);
@@ -391,10 +439,10 @@ impl ScrapeConfigDatabase {
             },
             sslmode: match self.sslmode {
                 None => {
-                    self.sslmode = Some(defaults.sslmode.clone());
-                    defaults.sslmode.clone()
+                    self.sslmode = Some(defaults.sslmode);
+                    defaults.sslmode
                 }
-                _ => self.sslmode.clone().unwrap(),
+                _ => self.sslmode.unwrap(),
             },
         };
 
@@ -486,6 +534,9 @@ fn substitute_envs(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use insta::assert_yaml_snapshot;
+    use insta::with_settings;
+    use rstest::rstest;
 
     #[test]
     fn test_substitute_envs() {
@@ -521,5 +572,61 @@ mod tests {
             result.unwrap_err().to_string(),
             format!("some environment variable(s) not defined: {text}")
         )
+    }
+
+    #[rstest]
+    #[case("empty", 0)]
+    #[case("defaults", 0)]
+    #[case("envs", 1)]
+    #[case("full", 3)]
+    fn test_scrape_config_parsing(#[case] name: &str, #[case] len: usize) {
+        env::set_var("TEST_PG_HOST", "host.from.env.com");
+        env::set_var("TEST_PG_PORT", "54321");
+        env::set_var("TEST_PG_USER", "user_from_env");
+        env::set_var("TEST_PG_PASSWORD", "password.from.env");
+        env::set_var("TEST_PG_SSLROOTCERT", "/env/path/to/rootcert");
+        env::set_var("TEST_PG_SSLCERT", "/env/path/to/cert");
+        env::set_var("TEST_PG_SSLKEY", "/env/path/to/key");
+
+        let config = ScrapeConfig::from_file(&format!("tests/configs/{name}.yaml")).unwrap();
+        let snapshot_suffix = format!("scrape_config_parsing__{name}");
+        with_settings!(
+            { description => format!("config file: {name}"), omit_expression => true },
+            { assert_yaml_snapshot!(snapshot_suffix, config) }
+        );
+
+        assert_eq!(config.len(), len);
+        assert!(config.is_empty() == (len == 0));
+    }
+
+    #[test]
+    fn test_scrape_config_database_display() {
+        let db = ScrapeConfigDatabase {
+            dbname: "testdb".to_string(),
+            connection_string: PostgresConnectionString {
+                host: "localhost".to_string(),
+                port: 5432,
+                user: "postgres".to_string(),
+                password: "password".to_string(),
+                sslmode: PostgresSslMode::Prefer,
+                dbname: "testdb".to_string(),
+            },
+            sslmode: None,
+            scrape_interval: Duration::default(),
+            query_timeout: Duration::default(),
+            backoff_interval: Duration::default(),
+            max_backoff_interval: Duration::default(),
+            metric_expiration_time: Duration::default(),
+            metric_prefix: None,
+            sslrootcert: None,
+            sslcert: None,
+            sslkey: None,
+            queries: vec![],
+        };
+
+        assert_eq!(
+            db.to_string(),
+            "host: localhost, port: 5432, user: postgres, dbname: testdb"
+        );
     }
 }

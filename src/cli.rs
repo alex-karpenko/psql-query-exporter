@@ -6,13 +6,13 @@ const INVALID_IP_ADDRESS_ERROR: &str = "IP address isn't valid";
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about)]
-pub struct AppConfig {
+pub struct CliParams {
     /// Write logs in JSON format
     #[clap(short, long)]
     pub json_log: bool,
 
     /// IP/hostname to listen on
-    #[clap(short, long, default_value_t = Ipv4Addr::new(0, 0, 0, 0), value_parser = AppConfig::parse_ip_address)]
+    #[clap(short, long, default_value_t = Ipv4Addr::new(0, 0, 0, 0), value_parser = CliParams::parse_ip_address)]
     pub listen_on: Ipv4Addr,
 
     /// Port to serve http on
@@ -24,9 +24,10 @@ pub struct AppConfig {
     pub config: String,
 }
 
-impl AppConfig {
-    pub fn new() -> AppConfig {
-        let config: AppConfig = Parser::parse();
+impl CliParams {
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> CliParams {
+        let config: CliParams = Parser::parse();
 
         config.setup_logger();
         config
@@ -58,11 +59,11 @@ mod tests {
     #[test]
     fn parse_correct_ip() {
         assert_eq!(
-            AppConfig::parse_ip_address("1.2.3.4"),
+            CliParams::parse_ip_address("1.2.3.4"),
             Ok(Ipv4Addr::new(1, 2, 3, 4))
         );
         assert_eq!(
-            AppConfig::parse_ip_address("0.0.0.0"),
+            CliParams::parse_ip_address("0.0.0.0"),
             Ok(Ipv4Addr::new(0, 0, 0, 0))
         );
     }
@@ -70,17 +71,17 @@ mod tests {
     #[test]
     fn parse_incorrect_ip() {
         assert_eq!(
-            AppConfig::parse_ip_address(".0.0.0"),
+            CliParams::parse_ip_address(".0.0.0"),
             Err(String::from(INVALID_IP_ADDRESS_ERROR))
         );
 
         assert_eq!(
-            AppConfig::parse_ip_address("qwerty"),
+            CliParams::parse_ip_address("qwerty"),
             Err(String::from(INVALID_IP_ADDRESS_ERROR))
         );
 
         assert_eq!(
-            AppConfig::parse_ip_address("1.2.3.444"),
+            CliParams::parse_ip_address("1.2.3.444"),
             Err(String::from(INVALID_IP_ADDRESS_ERROR))
         );
     }

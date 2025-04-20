@@ -1,0 +1,55 @@
+---
+source: src/config.rs
+description: "config file: envs"
+---
+defaults:
+  scrape_interval: 30m
+  query_timeout: 10s
+  backoff_interval: 10s
+  max_backoff_interval: 5m
+  metric_expiration_time: 0s
+  metric_prefix: ~
+  sslrootcert: ~
+  sslcert: ~
+  sslkey: ~
+  sslmode: prefer
+sources:
+  source_name_with_envs:
+    host: host.from.env.com
+    port: 54321
+    user: user_from_env
+    password: password.from.env
+    sslmode: verify-full
+    scrape_interval: 30m
+    query_timeout: 10s
+    backoff_interval: 10s
+    max_backoff_interval: 5m
+    metric_expiration_time: 0s
+    metric_prefix: ""
+    sslrootcert: /env/path/to/rootcert
+    sslcert: /env/path/to/cert
+    sslkey: /env/path/to/key
+    databases:
+      - dbname: test_db_name
+        scrape_interval: 30m
+        query_timeout: 10s
+        backoff_interval: 10s
+        max_backoff_interval: 5m
+        metric_expiration_time: 0s
+        metric_prefix: ""
+        sslcert: /env/path/to/cert
+        sslkey: /env/path/to/key
+        queries:
+          - query: SELECT * FROM TEST
+            metric_name: _env_test_metric
+            description: _env_test_metric
+            metric_prefix: ""
+            scrape_interval: 30m
+            query_timeout: 10s
+            metric_expiration_time: 0s
+            const_labels: ~
+            var_labels: ~
+            values:
+              single:
+                field: field1
+                type: int

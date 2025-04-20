@@ -1,5 +1,13 @@
 # psql-query-exporter
 
+<p>
+<a href="https://github.com/alex-karpenko/psql-query-exporter/actions/workflows/ci.yaml" rel="nofollow"><img src="https://img.shields.io/github/actions/workflow/status/alex-karpenko/psql-query-exporter/ci.yaml?label=ci" alt="CI status"></a>
+<a href="https://github.com/alex-karpenko/psql-query-exporter/actions/workflows/audit.yaml" rel="nofollow"><img src="https://img.shields.io/github/actions/workflow/status/alex-karpenko/psql-query-exporter/audit.yaml?label=audit" alt="Audit status"></a>
+<a href="https://github.com/alex-karpenko/psql-query-exporter/actions/workflows/publish-image.yaml" rel="nofollow"><img src="https://img.shields.io/github/actions/workflow/status/alex-karpenko/psql-query-exporter/publish-image.yaml?label=publish" alt="Docker image publishing status"></a>
+<a href="https://app.codecov.io/github/alex-karpenko/psql-query-exporter" rel="nofollow"><img src="https://img.shields.io/codecov/c/github/alex-karpenko/psql-query-exporter" alt="License"></a>
+<a href="https://github.com/alex-karpenko/psql-query-exporter/blob/HEAD/LICENSE" rel="nofollow"><img src="https://img.shields.io/github/license/alex-karpenko/psql-query-exporter" alt="License"></a>
+</p>
+
 [Prometheus](https://prometheus.io/docs/introduction/overview/) exporter to produce metrics from [PostgreSQL](https://www.postgresql.org/) queries on a periodic basis.
 
 ## Features
@@ -183,7 +191,7 @@ So `sources` section is a dictionary, each key is mnemonic name of the source. E
 
 #### Sources definition
 
-In the `host`, `user`, `password`, `sslrootcert`, `sslcert` and `sslkey` values environment variables can be used to set whole value of the field or part of it, by replacing `${NAME}` with value of the `NAME` environment variable. For example:
+In the `host`, `port`, `user`, `password`, `sslrootcert`, `sslcert` and `sslkey` values environment variables can be used to set whole value of the field or part of it, by replacing `${NAME}` with value of the `NAME` environment variable. For example:
 
 ```yaml
   host: db.${ENV_NAME}.example.com
@@ -218,6 +226,7 @@ sources:
     host: ""  # hostname of the DB instance, mandatory,
               # environment variable can be used here
     port: 5432  # port number of the DB, default is 5432
+                # environment variable can be used here
     user: ""  # username to log in to the DB, mandatory,
               # environment variable can be used here
     password: ""  # password to log in to the DB, mandatory,
@@ -248,7 +257,7 @@ sources:
                       # can be overridden in the DB/query section
 
     databases:   # list of the databases inside the instance, mandatory
-      - name: ""  # DB name, mandatory
+      - dbname: ""  # DB name, mandatory
         scrape_interval: 30m  # the same as above, applied to all queries of the DB, optional
         query_timeout: 10s    # the same as above, applied to all queries of the DB, optional
         metric_expiration_time: 0s  # if all query attempts during this time were failed,
@@ -299,7 +308,7 @@ sources:
                   type: int # int (default) or float, optional
                   labels:
                     label1: label_value1
-                    label3: label_value3
+                    label2: label_value3
               multi_suffixes: # create a separate metric for each value by adding suffix to the metric name
                 - field: field4
                   type: int # int (default) or float, optional
@@ -314,7 +323,7 @@ sources:
             .
           - query: ...
 
-      - name: "" # next db at the same instance
+      - dbname: "" # next db at the same instance
         .
         .
         .

@@ -1,0 +1,37 @@
+---
+source: src/metrics.rs
+description: "collector test case 'multi_suffixes', expired"
+---
+# HELP multi_suffixes_with_const_labels_float_suffix multi_suffixes_with_const_labels: float_suffix
+# TYPE multi_suffixes_with_const_labels_float_suffix gauge
+multi_suffixes_with_const_labels_float_suffix{const_label_key_1="const_label_value_1",const_label_key_2="const_label_value_2"} 66.66
+# HELP multi_suffixes_with_const_labels_int_suffix multi_suffixes_with_const_labels: int_suffix
+# TYPE multi_suffixes_with_const_labels_int_suffix gauge
+multi_suffixes_with_const_labels_int_suffix{const_label_key_1="const_label_value_1",const_label_key_2="const_label_value_2"} 66
+# HELP multi_suffixes_with_var_labels_count multi_suffixes_with_var_labels: count
+# TYPE multi_suffixes_with_var_labels_count gauge
+multi_suffixes_with_var_labels_count{name="Jack"} 1
+multi_suffixes_with_var_labels_count{name="Jane"} 1
+multi_suffixes_with_var_labels_count{name="John"} 1
+# HELP multi_suffixes_with_var_labels_float_suffix multi_suffixes_with_var_labels: float_suffix
+# TYPE multi_suffixes_with_var_labels_float_suffix gauge
+multi_suffixes_with_var_labels_float_suffix{name="Jack"} 23.32
+multi_suffixes_with_var_labels_float_suffix{name="Jane"} 22.22
+multi_suffixes_with_var_labels_float_suffix{name="John"} 21.12
+# HELP multi_suffixes_with_var_labels_int_suffix multi_suffixes_with_var_labels: int_suffix
+# TYPE multi_suffixes_with_var_labels_int_suffix gauge
+multi_suffixes_with_var_labels_int_suffix{name="Jack"} 23
+multi_suffixes_with_var_labels_int_suffix{name="Jane"} 22
+multi_suffixes_with_var_labels_int_suffix{name="John"} 21
+# HELP multi_suffixes_without_common_labels_float_suffix multi_suffixes_without_common_labels: float_suffix
+# TYPE multi_suffixes_without_common_labels_float_suffix gauge
+multi_suffixes_without_common_labels_float_suffix 66.66
+# HELP multi_suffixes_without_common_labels_int_suffix multi_suffixes_without_common_labels: int_suffix
+# TYPE multi_suffixes_without_common_labels_int_suffix gauge
+multi_suffixes_without_common_labels_int_suffix 66
+# HELP multi_suffixes_without_common_labels_with_desc_float_suffix single basic with description: float_suffix
+# TYPE multi_suffixes_without_common_labels_with_desc_float_suffix gauge
+multi_suffixes_without_common_labels_with_desc_float_suffix 66.66
+# HELP multi_suffixes_without_common_labels_with_desc_int_suffix single basic with description: int_suffix
+# TYPE multi_suffixes_without_common_labels_with_desc_int_suffix gauge
+multi_suffixes_without_common_labels_with_desc_int_suffix 66
