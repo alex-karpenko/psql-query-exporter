@@ -1,0 +1,30 @@
+---
+source: src/metrics.rs
+description: "collector test case 'multi_labels', after update 2"
+---
+# HELP multi_labels_with_const_labels multi_labels_with_const_labels
+# TYPE multi_labels_with_const_labels gauge
+multi_labels_with_const_labels{const_label_key_1="const_label_value_1",const_label_key_2="const_label_value_2",multi_label1="multi_label_value1",multi_label2="multi_label_value2"} 66
+multi_labels_with_const_labels{const_label_key_1="const_label_value_1",const_label_key_2="const_label_value_2",multi_label1="multi_label_value3",multi_label2="multi_label_value4"} 67
+# HELP multi_labels_with_expiration multi_labels_with_expiration
+# TYPE multi_labels_with_expiration gauge
+multi_labels_with_expiration{expires_in="5s"} 6
+# HELP multi_labels_with_var_labels multi_labels_with_var_labels
+# TYPE multi_labels_with_var_labels gauge
+multi_labels_with_var_labels{name="Jack",type="count"} 1
+multi_labels_with_var_labels{name="Jack",type="float_sum"} 24
+multi_labels_with_var_labels{name="Jack",type="int_sum"} 23
+multi_labels_with_var_labels{name="Jane",type="count"} 1
+multi_labels_with_var_labels{name="Jane",type="float_sum"} 23
+multi_labels_with_var_labels{name="Jane",type="int_sum"} 22
+multi_labels_with_var_labels{name="John",type="count"} 1
+multi_labels_with_var_labels{name="John",type="float_sum"} 22
+multi_labels_with_var_labels{name="John",type="int_sum"} 21
+# HELP multi_labels_without_common_labels multi_labels_without_common_labels
+# TYPE multi_labels_without_common_labels gauge
+multi_labels_without_common_labels{multi_label1="multi_label_value1",multi_label2="multi_label_value2"} 66
+multi_labels_without_common_labels{multi_label1="multi_label_value3",multi_label2="multi_label_value4"} 67
+# HELP multi_labels_without_common_labels_with_desc single basic with description
+# TYPE multi_labels_without_common_labels_with_desc gauge
+multi_labels_without_common_labels_with_desc{multi_label1="multi_label_value1",multi_label2="multi_label_value2"} 66
+multi_labels_without_common_labels_with_desc{multi_label1="multi_label_value3",multi_label2="multi_label_value4"} 66.66

@@ -77,15 +77,18 @@ impl QueryMetrics {
                         query_config.description.clone().unwrap()
                     );
 
-                    if let Some(const_labels) = &query_config.const_labels {
-                        let mut const_labels: HashMap<String, String> =
-                            const_labels.clone().into_iter().collect();
+                    let mut labels = HashMap::new();
+                    value.labels.iter().for_each(|(k, v)| {
+                        labels.insert(k.to_string(), v.to_string());
+                    });
 
-                        value.labels.iter().for_each(|(k, v)| {
-                            const_labels.insert(k.to_string(), v.to_string());
+                    if let Some(const_labels) = &query_config.const_labels {
+                        const_labels.iter().for_each(|(k, v)| {
+                            labels.insert(k.to_string(), v.to_string());
                         });
-                        opts = opts.const_labels(const_labels);
                     }
+
+                    opts = opts.const_labels(labels);
                     let new_metric = Self::helper_create_metric(
                         &query_config.var_labels,
                         &value.field_type,
@@ -169,25 +172,31 @@ impl QueryMetrics {
         self.last_updated = SystemTime::now();
         if !self.is_registered {
             for metric in self.metrics.iter() {
-                let metric = metric.to_collector();
-                registry
-                    .register(metric)
-                    .unwrap_or_else(|e| panic!("error while registering metric: {e}"));
+                let boxed_metric = metric.to_collector();
+                if let Err(e) = registry.register(boxed_metric) {
+                    error!(?metric, "error while registering metric: {e}");
+                    return;
+                } else {
+                    debug!(?metric, "metric registered");
+                }
             }
             self.is_registered = true;
-        };
+        }
     }
 
     fn unregister(&mut self, registry: &Registry) {
         if self.is_registered {
             for metric in self.metrics.iter() {
-                let metric = metric.to_collector();
-                registry
-                    .unregister(metric)
-                    .unwrap_or_else(|e| panic!("error while un-registering metric: {e}"));
+                let boxed_metric = metric.to_collector();
+                if let Err(e) = registry.unregister(boxed_metric) {
+                    error!(?metric, "error while unregistering metric: {e}");
+                    return;
+                } else {
+                    debug!(?metric, "metric unregistered");
+                }
             }
             self.is_registered = false;
-        };
+        }
     }
 }
 
@@ -505,6 +514,8 @@ mod tests {
 
     #[rstest]
     #[case("single", 2)]
+    #[case("multi_labels", 2)]
+    // #[case("multi_suffixes", 2)]
     #[tokio::test]
     async fn test_collect_one_db_instance_single_basic(
         #[case] case_name: &str,
@@ -564,19 +575,19 @@ mod tests {
                 .collect();
             // Run queries one by one
             for query in queries {
-                db.query(&query, Duration::from_secs(1)).await.unwrap();
+                db.query(query, Duration::from_secs(1)).await.unwrap();
             }
             // Wait for more than 2s for the next scrape round
             tokio::time::sleep(Duration::from_secs(3)).await;
             let metrics = compose_reply(registry.clone()).await;
             with_settings!(
-                { description => format!("collector test case '{}', after update 1", case_name), omit_expression => true },
+                { description => format!("collector test case '{case_name}', after update {round}"), omit_expression => true },
                 { assert_snapshot!(format!("{case_name}_updated_{round}"), metrics) }
             );
         }
 
         // Wait for expiration
-        tokio::time::sleep(Duration::from_secs(3)).await;
+        tokio::time::sleep(Duration::from_secs(6)).await;
         let metrics = compose_reply(registry).await;
         with_settings!(
             { description => format!("collector test case '{}', expired", case_name), omit_expression => true },

@@ -39,8 +39,6 @@ jobs:
           sudo chown 70 tests/tls/server.key
 
       - name: Test
-        env:
-          RUST_LOG: debug
         run: cargo test
 
   docker-test:
