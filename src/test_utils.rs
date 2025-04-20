@@ -61,7 +61,10 @@ async fn psql_server_container() -> &'static ContainerAsync<images::Postgres> {
                 .with_init_sql(Path::new("tests/init/init_db.sql"))
                 .with_init_sh(Path::new("tests/init/init_conf.sh"))
                 .with_ssl_enabled()
-                .with_container_name("test-psql-query-exporter")
+                .with_container_name(format!(
+                    "test-psql-query-exporter-v{}",
+                    images::Postgres::version()
+                ))
                 .start()
                 .await
                 .unwrap()
@@ -80,25 +83,6 @@ mod images {
     const NAME: &str = "postgres";
     const DEFAULT_PG_VERSION: &str = "17";
 
-    /// Module to work with [`Postgres`] inside of tests.
-    ///
-    /// Starts an instance of Postgres.
-    /// This module is based on the official [`Postgres docker image`].
-    ///
-    /// Default db name, user and password is `postgres`.
-    ///
-    /// # Example
-    /// ```
-    /// use test_utils::{images, testcontainers::runners::SyncRunner};
-    ///
-    /// let postgres_instance = images::Postgres::default().start().unwrap();
-    ///
-    /// let connection_string = format!(
-    ///     "postgres://postgres:postgres@{}:{}/postgres",
-    ///     postgres_instance.get_host().unwrap(),
-    ///     postgres_instance.get_host_port_ipv4(5432).unwrap()
-    /// );
-    /// ```
     #[derive(Debug, Clone)]
     pub struct Postgres {
         env_vars: HashMap<String, String>,
@@ -156,6 +140,10 @@ mod images {
             self.ssl = true;
             self
         }
+
+        pub fn version() -> String {
+            env::var("PG_VERSION").unwrap_or_else(|_| DEFAULT_PG_VERSION.to_owned())
+        }
     }
 
     impl Default for Postgres {
@@ -196,8 +184,7 @@ mod images {
         }
 
         fn tag(&self) -> &str {
-            let version = env::var("PG_VERSION").unwrap_or_else(|_| DEFAULT_PG_VERSION.to_owned());
-            Box::leak(format!("{version}-alpine").into_boxed_str())
+            Box::leak(format!("{}-alpine", Self::version()).into_boxed_str())
         }
 
         fn ready_conditions(&self) -> Vec<WaitFor> {
