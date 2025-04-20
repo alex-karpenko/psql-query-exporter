@@ -1,12 +1,7 @@
 /target/
-/values-dev.yaml
-/values-test.yaml
-/config-dev.yaml
-/config-local.yaml
-/config-empty.yaml
+/values-*.yaml
+/config-*.yaml
 .vscode
-/*.pem
 /.idea
 .DS_Store
-
-docker_tests/
+/*.pem

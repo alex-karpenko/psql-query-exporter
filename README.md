@@ -191,7 +191,7 @@ So `sources` section is a dictionary, each key is mnemonic name of the source. E
 
 #### Sources definition
 
-In the `host`, `user`, `password`, `sslrootcert`, `sslcert` and `sslkey` values environment variables can be used to set whole value of the field or part of it, by replacing `${NAME}` with value of the `NAME` environment variable. For example:
+In the `host`, `port`, `user`, `password`, `sslrootcert`, `sslcert` and `sslkey` values environment variables can be used to set whole value of the field or part of it, by replacing `${NAME}` with value of the `NAME` environment variable. For example:
 
 ```yaml
   host: db.${ENV_NAME}.example.com
@@ -226,6 +226,7 @@ sources:
     host: ""  # hostname of the DB instance, mandatory,
               # environment variable can be used here
     port: 5432  # port number of the DB, default is 5432
+                # environment variable can be used here
     user: ""  # username to log in to the DB, mandatory,
               # environment variable can be used here
     password: ""  # password to log in to the DB, mandatory,
@@ -307,7 +308,7 @@ sources:
                   type: int # int (default) or float, optional
                   labels:
                     label1: label_value1
-                    label3: label_value3
+                    label2: label_value3
               multi_suffixes: # create a separate metric for each value by adding suffix to the metric name
                 - field: field4
                   type: int # int (default) or float, optional
