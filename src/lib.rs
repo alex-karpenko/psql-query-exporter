@@ -60,7 +60,7 @@ async fn web_server(
 
     let listener = TcpListener::bind(&addr)
         .await
-        .unwrap_or_else(|_| panic!("unable to bind to address {:?}", addr));
+        .unwrap_or_else(|_| panic!("unable to bind to address {addr:?}"));
     let server = axum::serve(listener, app).with_graceful_shutdown(async move {
         shutdown_rx.changed().await.unwrap();
     });

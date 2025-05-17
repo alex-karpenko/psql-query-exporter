@@ -134,12 +134,10 @@ impl PostgresSslCertificates {
     ) -> Result<Self, PsqlExporterError> {
         match (cert, key) {
             (Some(cert), None) => Err(PsqlExporterError::PostgresTlsClientConfig(format!(
-                "private key for client certificate {} should be defined.",
-                cert
+                "private key for client certificate {cert} should be defined."
             ))),
             (None, Some(key)) => Err(PsqlExporterError::PostgresTlsClientConfig(format!(
-                "client certificate for private key {} should be defined.",
-                key
+                "client certificate for private key {key} should be defined."
             ))),
             (Some(cert), Some(key)) => Ok(Self {
                 rootcert,
@@ -401,7 +399,7 @@ mod tests {
             format!("host=localhost port=4321 dbname=XXXXXXXX user=YYYYYYYY password='***' sslmode=prefer application_name={}-v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
         );
         assert_eq!(
-            format!("{:?}", conn_string),
+            format!("{conn_string:?}"),
             format!("host=localhost port=4321 dbname=XXXXXXXX user=YYYYYYYY password='***' sslmode=prefer application_name={}-v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
         );
     }
