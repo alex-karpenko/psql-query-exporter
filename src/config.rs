@@ -95,7 +95,7 @@ impl TcpPort {
 
         let port: u16 = s
             .parse()
-            .map_err(|_| PsqlExporterError::InvalidConfigValue(format!("port number: {}", s)))?;
+            .map_err(|_| PsqlExporterError::InvalidConfigValue(format!("port number: {s}")))?;
         Ok(port)
     }
 }
@@ -564,8 +564,7 @@ mod tests {
         let result = substitute_envs(text, &envs);
         assert!(
             result.is_err(),
-            "Expected error, but got result: {:?}",
-            result
+            "Expected error, but got result: {result:?}"
         );
 
         assert_eq!(
