@@ -8,7 +8,7 @@ pub mod utils;
 #[cfg(test)]
 pub mod test_utils;
 
-use axum::{response::Html, routing::get, Router};
+use axum::{Router, response::Html, routing::get};
 use config::ScrapeConfig;
 use metrics::collectors_task;
 use prometheus::Registry;

@@ -7,7 +7,7 @@ use crate::utils::{ShutdownReceiver, SleepHelper};
 use human_repr::HumanDuration;
 use prometheus::core::{AtomicF64, AtomicI64, Collector, GenericGauge, GenericGaugeVec};
 use prometheus::{
-    opts, Encoder, Gauge, GaugeVec, IntGauge, IntGaugeVec, Opts, Registry, TextEncoder,
+    Encoder, Gauge, GaugeVec, IntGauge, IntGaugeVec, Opts, Registry, TextEncoder, opts,
 };
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
@@ -502,8 +502,8 @@ mod tests {
     use crate::{
         db::PostgresSslMode,
         test_utils::{
-            create_test_connection_string, init_psql_server, init_tracing, TEST_DB_PASSWORD,
-            TEST_DB_USER,
+            TEST_DB_PASSWORD, TEST_DB_USER, create_test_connection_string, init_psql_server,
+            init_tracing,
         },
     };
     use insta::assert_snapshot;
@@ -528,9 +528,11 @@ mod tests {
         let (tx, rx) = watch::channel(false);
 
         // Configure collectors task
-        env::set_var("TEST_PG_PORT", format!("{port}"));
-        env::set_var("TEST_PG_USER", TEST_DB_USER);
-        env::set_var("TEST_PG_PASSWORD", TEST_DB_PASSWORD);
+        unsafe {
+            env::set_var("TEST_PG_PORT", format!("{port}"));
+            env::set_var("TEST_PG_USER", TEST_DB_USER);
+            env::set_var("TEST_PG_PASSWORD", TEST_DB_PASSWORD);
+        }
 
         let config =
             ScrapeConfig::from_file(&format!("tests/cases/{case_name}/config.yaml")).unwrap();

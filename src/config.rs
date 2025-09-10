@@ -540,11 +540,13 @@ mod tests {
 
     #[test]
     fn test_substitute_envs() {
-        env::set_var("POSTGRES_USER", "postgres");
-        env::set_var("POSTGRES_PASSWORD", "password");
-        env::set_var("POSTGRES_HOST", "localhost");
-        env::set_var("POSTGRES_PORT", "5432");
-        env::set_var("POSTGRES_DB", "psql_exporter");
+        unsafe {
+            env::set_var("POSTGRES_USER", "postgres");
+            env::set_var("POSTGRES_PASSWORD", "password");
+            env::set_var("POSTGRES_HOST", "localhost");
+            env::set_var("POSTGRES_PORT", "5432");
+            env::set_var("POSTGRES_DB", "psql_exporter");
+        }
 
         let envs = hashmap_from_envs();
 
@@ -579,14 +581,15 @@ mod tests {
     #[case("envs", 1)]
     #[case("full", 3)]
     fn test_scrape_config_parsing(#[case] name: &str, #[case] len: usize) {
-        env::set_var("TEST_PG_HOST", "host.from.env.com");
-        env::set_var("TEST_PG_PORT", "54321");
-        env::set_var("TEST_PG_USER", "user_from_env");
-        env::set_var("TEST_PG_PASSWORD", "password.from.env");
-        env::set_var("TEST_PG_SSLROOTCERT", "/env/path/to/rootcert");
-        env::set_var("TEST_PG_SSLCERT", "/env/path/to/cert");
-        env::set_var("TEST_PG_SSLKEY", "/env/path/to/key");
-
+        unsafe {
+            env::set_var("TEST_PG_HOST", "host.from.env.com");
+            env::set_var("TEST_PG_PORT", "54321");
+            env::set_var("TEST_PG_USER", "user_from_env");
+            env::set_var("TEST_PG_PASSWORD", "password.from.env");
+            env::set_var("TEST_PG_SSLROOTCERT", "/env/path/to/rootcert");
+            env::set_var("TEST_PG_SSLCERT", "/env/path/to/cert");
+            env::set_var("TEST_PG_SSLKEY", "/env/path/to/key");
+        }
         let config = ScrapeConfig::from_file(&format!("tests/configs/{name}.yaml")).unwrap();
         let snapshot_suffix = format!("scrape_config_parsing__{name}");
         with_settings!(

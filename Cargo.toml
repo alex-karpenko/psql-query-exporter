@@ -1,7 +1,7 @@
 [package]
 name = "psql-query-exporter"
-version = "0.3.0"
-edition = "2021"
+version = "0.3.1"
+edition = "2024"
 authors = ["Oleksii Karpenko <alexkarpenko@yahoo.com>"]
 description = "PostgreSQL Query Prometheus exporter"
 repository = "https://github.com/alex-karpenko/psql-query-exporter"
@@ -9,25 +9,25 @@ license = "MIT OR Apache-2.0"
 keywords = ["postgres", "postgresql", "prometheus", "exporter"]
 
 [dependencies]
-axum = { version = "0.8.3", default-features = false, features = ["tokio", "http1"] }
-clap = { version = "4.5.37", features = ["derive"] }
+axum = { version = "0.8.4", default-features = false, features = ["tokio", "http1"] }
+clap = { version = "4.5.47", features = ["derive"] }
 envsubst = "0.2.1"
 human-repr = "1.1.0"
 humantime-serde = "1.1.1"
-openssl = "0.10.70"
-openssl-sys = "0.9.104"
+openssl = "0.10.73"
+openssl-sys = "0.9.109"
 postgres-openssl = "0.5.0"
 prometheus = "0.14.0"
 serde = { version = "1.0.215", features = ["derive"] }
 serde_yaml_ng = "0.10.0"
-thiserror = "2.0.12"
-tokio = { version = "1.43.0", features = ["full"] }
+thiserror = "2.0.16"
+tokio = { version = "1.47.1", features = ["full"] }
 tokio-postgres = "0.7.12"
 tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.19", features = ["env-filter", "json"] }
+tracing-subscriber = { version = "0.3.20", features = ["env-filter", "json"] }
 
 [dev-dependencies]
-insta = { version = "1.42.2", features = ["yaml"] }
-reqwest = { version = "0.12.15", default-features = false }
-rstest = "0.25.0"
-testcontainers = { version = "0.23.3", features = ["blocking"] }
+insta = { version = "1.43.2", features = ["yaml"] }
+reqwest = { version = "0.12.23", default-features = false }
+rstest = "0.26.1"
+testcontainers = { version = "0.25.0", features = ["blocking"] }
