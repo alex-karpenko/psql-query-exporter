@@ -3,7 +3,7 @@ use std::{
     path::Path,
     sync::atomic::{AtomicU16, Ordering},
 };
-use testcontainers::{runners::AsyncRunner, ContainerAsync, ImageExt};
+use testcontainers::{ContainerAsync, ImageExt, runners::AsyncRunner};
 use tokio::sync::OnceCell;
 use tracing::info;
 
@@ -92,8 +92,8 @@ mod images {
     use super::*;
     use std::{borrow::Cow, collections::HashMap, env};
     use testcontainers::{
-        core::{AccessMode, Mount, WaitFor},
         CopyDataSource, CopyToContainer, Image,
+        core::{AccessMode, Mount, WaitFor},
     };
 
     const NAME: &str = "postgres";

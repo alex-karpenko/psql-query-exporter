@@ -2,7 +2,7 @@ use crate::errors::PsqlExporterError;
 use std::{error::Error, time::Duration};
 use tokio::{
     select,
-    signal::unix::{signal, Signal, SignalKind},
+    signal::unix::{Signal, SignalKind, signal},
     sync::watch,
 };
 use tracing::{debug, error, info, instrument};

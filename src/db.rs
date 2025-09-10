@@ -36,12 +36,12 @@ impl PostgresConnectionString {
 
         format!(
             "host={host} port={port} dbname={dbname} user={user} password='{password}' sslmode={sslmode} application_name={DB_APP_NAME}-v{DB_APP_VERSION}",
-            host=self.host,
-            port=self.port,
-            user=self.user,
-            password=password,
-            sslmode=self.sslmode,
-            dbname=self.dbname
+            host = self.host,
+            port = self.port,
+            user = self.user,
+            password = password,
+            sslmode = self.sslmode,
+            dbname = self.dbname
         )
     }
 }
@@ -88,22 +88,17 @@ pub struct PostgresConnection {
     shutdown_channel: ShutdownReceiver,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Copy)]
+#[derive(Default, Deserialize, Serialize, Debug, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
 pub enum PostgresSslMode {
     Disable,
+    #[default]
     Prefer,
     Require,
     #[serde(rename = "verify-ca")]
     VerifyCa,
     #[serde(rename = "verify-full")]
     VerifyFull,
-}
-
-impl Default for PostgresSslMode {
-    fn default() -> Self {
-        Self::Prefer
-    }
 }
 
 impl Display for PostgresSslMode {
@@ -379,7 +374,11 @@ mod tests {
 
         assert_eq!(
             conn_string.get_conn_string(),
-            format!("host=localhost port=4321 dbname=XXXXXXXX user=YYYYYYYY password='ZZZZZZZ' sslmode=prefer application_name={}-v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
+            format!(
+                "host=localhost port=4321 dbname=XXXXXXXX user=YYYYYYYY password='ZZZZZZZ' sslmode=prefer application_name={}-v{}",
+                env!("CARGO_PKG_NAME"),
+                env!("CARGO_PKG_VERSION")
+            )
         );
     }
 
@@ -396,11 +395,19 @@ mod tests {
 
         assert_eq!(
             conn_string.to_string(),
-            format!("host=localhost port=4321 dbname=XXXXXXXX user=YYYYYYYY password='***' sslmode=prefer application_name={}-v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
+            format!(
+                "host=localhost port=4321 dbname=XXXXXXXX user=YYYYYYYY password='***' sslmode=prefer application_name={}-v{}",
+                env!("CARGO_PKG_NAME"),
+                env!("CARGO_PKG_VERSION")
+            )
         );
         assert_eq!(
             format!("{conn_string:?}"),
-            format!("host=localhost port=4321 dbname=XXXXXXXX user=YYYYYYYY password='***' sslmode=prefer application_name={}-v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
+            format!(
+                "host=localhost port=4321 dbname=XXXXXXXX user=YYYYYYYY password='***' sslmode=prefer application_name={}-v{}",
+                env!("CARGO_PKG_NAME"),
+                env!("CARGO_PKG_VERSION")
+            )
         );
     }
 

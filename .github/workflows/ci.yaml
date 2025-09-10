@@ -1,9 +1,10 @@
+name: Continuous integration
 on:
   pull_request:
   schedule:
     - cron: "17 5 * * 5"
-
-name: Continuous integration
+permissions:
+  contents: read
 
 jobs:
   ci:
