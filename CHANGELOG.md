@@ -10,6 +10,10 @@ All notable changes to this project will be documented in this file.
 #### Fixed
 - Fix typos in comments and ocumentation by @alex-karpenko in [#68](https://github.com/alex-karpenko/psql-query-exporter/pull/68)
 - Fix lint warnings by @alex-karpenko in [#69](https://github.com/alex-karpenko/psql-query-exporter/pull/69)
+- Update git-cliff action version
+
+## New Contributors
+* @alex-karpenko made their first contribution
 
 ## [0.3.0] - 2025-04-20
 ### Details
