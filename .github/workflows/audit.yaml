@@ -14,6 +14,8 @@ on:
       - '**/Cargo.toml'
       - '**/Cargo.lock'
       - deny.toml
+permissions:
+  contents: read
 
 jobs:
   security-audit:
