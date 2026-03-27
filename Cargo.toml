@@ -1,6 +1,6 @@
 [package]
 name = "psql-query-exporter"
-version = "0.3.3"
+version = "0.3.4"
 edition = "2024"
 authors = ["Oleksii Karpenko <alexkarpenko@yahoo.com>"]
 description = "PostgreSQL Query Prometheus exporter"
