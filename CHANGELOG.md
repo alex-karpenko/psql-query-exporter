@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.5] - 2026-04-25
+### Details
+#### Fixed
+- Update dependencies to fix known vulnerabilities by @alex-karpenko in [#74](https://github.com/alex-karpenko/psql-query-exporter/pull/74)
+
 ## [0.3.4] - 2026-03-27
 ### Details
 #### Fixed
@@ -259,6 +264,7 @@ All notable changes to this project will be documented in this file.
 
 * @oleksii-karpenko-rri made their first contribution
 
+[0.3.5]: https://github.com/alex-karpenko/psql-query-exporter/compare/v0.3.4..v0.3.5
 [0.3.4]: https://github.com/alex-karpenko/psql-query-exporter/compare/v0.3.3..v0.3.4
 [0.3.3]: https://github.com/alex-karpenko/psql-query-exporter/compare/v0.3.2..v0.3.3
 [0.3.2]: https://github.com/alex-karpenko/psql-query-exporter/compare/v0.3.1..v0.3.2
