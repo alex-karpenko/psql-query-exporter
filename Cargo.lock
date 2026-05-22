@@ -535,6 +535,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "dtor"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2137ce22f50d4c43ce098daf41c904cc700de1ce8bc2daf53ed4e702180a464"
+dependencies = [
+ "linktime-proc-macro",
+]
+
+[[package]]
 name = "dyn-clone"
 version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1290,6 +1299,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "linktime-proc-macro"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a44cd706ff0d503ee32b2071166510ca27e281228de10cd3aa8d35ff94560f81"
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1802,6 +1817,7 @@ version = "0.3.6"
 dependencies = [
  "axum",
  "clap",
+ "dtor",
  "envsubst",
  "human-repr",
  "humantime-serde",
