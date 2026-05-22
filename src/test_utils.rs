@@ -1,10 +1,14 @@
+use dtor::dtor;
 use std::{
+    env,
     net::SocketAddr,
     path::Path,
     sync::atomic::{AtomicU16, Ordering},
+    thread,
 };
 use testcontainers::{ContainerAsync, ImageExt, runners::AsyncRunner};
-use tokio::sync::OnceCell;
+use tokio::runtime::Runtime;
+use tokio::sync::{Mutex, OnceCell, RwLock};
 use tracing::info;
 
 use crate::db::{PostgresConnectionString, PostgresSslMode};
@@ -18,6 +22,8 @@ pub const TEST_CLIENT_CERT: &str = "tests/tls/client.crt";
 pub const TEST_CLIENT_KEY: &str = "tests/tls/client.key";
 pub const TEST_SERVER_CERT: &str = "tests/tls/server.crt";
 pub const TEST_SERVER_KEY: &str = "tests/tls/server.key";
+
+const DISABLE_CONTAINER_DESTRUCTORS_ENV_NAME: &str = "DISABLE_CONTAINER_DESTRUCTORS";
 
 pub fn next_addr() -> SocketAddr {
     static PORT: AtomicU16 = AtomicU16::new(9000);
@@ -33,13 +39,17 @@ pub async fn init_tracing() {
         .await;
 }
 
-static PSQL_CONTAINER: OnceCell<ContainerAsync<images::Postgres>> = OnceCell::const_new();
+static PSQL_CONTAINER: OnceCell<RwLock<Option<ContainerAsync<images::Postgres>>>> =
+    OnceCell::const_new();
 
 pub async fn init_psql_server() -> u16 {
     init_tracing().await;
 
-    let port = psql_server_container()
-        .await
+    let container_lock = psql_server_container().await;
+    let container = container_lock.read().await;
+    let port = container
+        .as_ref()
+        .unwrap()
         .get_host_port_ipv4(5432)
         .await
         .unwrap();
@@ -49,14 +59,18 @@ pub async fn init_psql_server() -> u16 {
 }
 
 pub async fn drop_psql_server() {
-    let container = psql_server_container().await;
-    container.stop().await.unwrap();
+    let container_lock = psql_server_container().await;
+    let mut container = container_lock.write().await;
+    if let Some(c) = container.take() {
+        c.stop().await.unwrap();
+        c.rm().await.unwrap();
+    }
 }
 
-async fn psql_server_container() -> &'static ContainerAsync<images::Postgres> {
+async fn psql_server_container() -> &'static RwLock<Option<ContainerAsync<images::Postgres>>> {
     PSQL_CONTAINER
         .get_or_init(async || {
-            images::Postgres::default()
+            let container = images::Postgres::default()
                 .with_db_name(TEST_DB_NAME)
                 .with_user(TEST_DB_USER)
                 .with_password(TEST_DB_PASSWORD)
@@ -69,7 +83,8 @@ async fn psql_server_container() -> &'static ContainerAsync<images::Postgres> {
                 ))
                 .start()
                 .await
-                .unwrap()
+                .unwrap();
+            RwLock::new(Some(container))
         })
         .await
 }
@@ -243,6 +258,30 @@ mod images {
                 vec![]
             }
         }
+    }
+}
+
+#[dtor(unsafe)]
+fn shutdown_test_containers() {
+    static LOCK: Mutex<()> = Mutex::const_new(());
+
+    if env::var(DISABLE_CONTAINER_DESTRUCTORS_ENV_NAME).is_err() {
+        let _ = thread::spawn(|| {
+            Runtime::new().unwrap().block_on(async {
+                let _guard = LOCK.lock().await;
+
+                if let Some(container_lock) = PSQL_CONTAINER.get() {
+                    let mut container = container_lock.write().await;
+                    if container.is_some() {
+                        let old = container.take().unwrap();
+                        let _ = old.stop().await;
+                        let _ = old.rm().await;
+                        *container = None;
+                    }
+                }
+            });
+        })
+        .join();
     }
 }
 

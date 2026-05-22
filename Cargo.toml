@@ -30,6 +30,7 @@ tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 
 [dev-dependencies]
+dtor = "1.0.3"
 insta = { version = "1.47.2", features = ["yaml"] }
 reqwest = { version = "0.13.3", default-features = false }
 rstest = "0.26.1"

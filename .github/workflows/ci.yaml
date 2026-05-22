@@ -39,12 +39,12 @@ jobs:
           sudo chmod 400 tests/tls/*.key
           sudo chown 70 tests/tls/server.key
 
-      - name: Test with latest PostgreSQL version (17)
+      - name: Test with latest PostgreSQL version (18)
         run: cargo test
 
-      - name: Test with minimal supported PostgreSQL version (13)
+      - name: Test with minimal supported PostgreSQL version (14)
         env:
-          PG_VERSION: "13"
+          PG_VERSION: "14"
         run: cargo test
 
       - name: Test with still used PostgreSQL version (11)
