@@ -218,7 +218,7 @@ impl ScrapeConfig {
         let mut config: ScrapeConfig = serde_yaml_ng::from_str(&config)?;
 
         config.defaults.merge_env_vars()?;
-        for (_name, instance) in config.sources.iter_mut() {
+        for instance in config.sources.values_mut() {
             instance.merge_env_vars()?;
             instance.propagate_defaults(&config.defaults);
         }
