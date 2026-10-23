@@ -215,7 +215,10 @@ impl ScrapeConfig {
             filename: path.clone(),
             cause: e,
         })?;
-        let mut config: ScrapeConfig = serde_yaml_ng::from_str(&config)?;
+        let mut config: ScrapeConfig = serde_saphyr::from_str_with_options(
+            &config,
+            serde_saphyr::options! { with_snippet: false },
+        )?;
 
         config.defaults.merge_env_vars()?;
         for instance in config.sources.values_mut() {

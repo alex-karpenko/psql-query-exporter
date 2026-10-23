@@ -8,7 +8,7 @@ pub enum PsqlExporterError {
     #[error("unable to parse config: {}", .cause)]
     ParseConfigFile {
         #[from]
-        cause: serde_yaml_ng::Error,
+        cause: serde_saphyr::Error,
     },
     #[error("unable to parse config: {0}")]
     InvalidConfigValue(String),
