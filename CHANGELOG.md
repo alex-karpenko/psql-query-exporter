@@ -2,13 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.8] - 2026-10-23
+### Details
+#### Fixed
+- Update dependencies to fix known vulnerabilities by @alex-karpenko in [#78](https://github.com/alex-karpenko/psql-query-exporter/pull/78)
+
 ## [0.3.7] - 2026-06-19
 ### Details
 #### Added
-- Implement automatic test container cleanup using destructor pattern
+- Implement automatic test container cleanup using destructor pattern by @alex-karpenko in [#76](https://github.com/alex-karpenko/psql-query-exporter/pull/76)
 
 #### Changed
-- Update dependencies to fix known vulnerabilities
+- Update dependencies to fix known vulnerabilities by @alex-karpenko in [#77](https://github.com/alex-karpenko/psql-query-exporter/pull/77)
 
 ## [0.3.6] - 2026-05-22
 ### Details
@@ -277,6 +282,7 @@ All notable changes to this project will be documented in this file.
 
 * @oleksii-karpenko-rri made their first contribution
 
+[0.3.8]: https://github.com/alex-karpenko/psql-query-exporter/compare/v0.3.7..v0.3.8
 [0.3.7]: https://github.com/alex-karpenko/psql-query-exporter/compare/v0.3.6..v0.3.7
 [0.3.6]: https://github.com/alex-karpenko/psql-query-exporter/compare/v0.3.5..v0.3.6
 [0.3.5]: https://github.com/alex-karpenko/psql-query-exporter/compare/v0.3.4..v0.3.5
