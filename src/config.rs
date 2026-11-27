@@ -28,15 +28,15 @@ pub struct ScrapeConfig {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields, default)]
 struct ScrapeConfigDefaults {
-    #[serde(with = "humantime_serde")]
+    #[serde(with = "jiff::fmt::serde::unsigned_duration::friendly::compact::required")]
     scrape_interval: Duration,
-    #[serde(with = "humantime_serde")]
+    #[serde(with = "jiff::fmt::serde::unsigned_duration::friendly::compact::required")]
     query_timeout: Duration,
-    #[serde(with = "humantime_serde")]
+    #[serde(with = "jiff::fmt::serde::unsigned_duration::friendly::compact::required")]
     backoff_interval: Duration,
-    #[serde(with = "humantime_serde")]
+    #[serde(with = "jiff::fmt::serde::unsigned_duration::friendly::compact::required")]
     max_backoff_interval: Duration,
-    #[serde(with = "humantime_serde")]
+    #[serde(with = "jiff::fmt::serde::unsigned_duration::friendly::compact::required")]
     metric_expiration_time: Duration,
     metric_prefix: Option<String>,
     sslrootcert: Option<String>,
@@ -55,15 +55,30 @@ pub struct ScrapeConfigSource {
     password: String,
     #[serde(default)]
     sslmode: Option<PostgresSslMode>,
-    #[serde(with = "humantime_serde", default)]
+    #[serde(
+        with = "jiff::fmt::serde::unsigned_duration::friendly::compact::required",
+        default
+    )]
     scrape_interval: Duration,
-    #[serde(with = "humantime_serde", default)]
+    #[serde(
+        with = "jiff::fmt::serde::unsigned_duration::friendly::compact::required",
+        default
+    )]
     query_timeout: Duration,
-    #[serde(with = "humantime_serde", default)]
+    #[serde(
+        with = "jiff::fmt::serde::unsigned_duration::friendly::compact::required",
+        default
+    )]
     backoff_interval: Duration,
-    #[serde(with = "humantime_serde", default)]
+    #[serde(
+        with = "jiff::fmt::serde::unsigned_duration::friendly::compact::required",
+        default
+    )]
     max_backoff_interval: Duration,
-    #[serde(with = "humantime_serde", default)]
+    #[serde(
+        with = "jiff::fmt::serde::unsigned_duration::friendly::compact::required",
+        default
+    )]
     metric_expiration_time: Duration,
     metric_prefix: Option<String>,
     sslrootcert: Option<String>,
@@ -123,15 +138,30 @@ pub struct ScrapeConfigDatabase {
     pub connection_string: PostgresConnectionString,
     #[serde(skip)]
     pub sslmode: Option<PostgresSslMode>,
-    #[serde(with = "humantime_serde", default)]
+    #[serde(
+        with = "jiff::fmt::serde::unsigned_duration::friendly::compact::required",
+        default
+    )]
     scrape_interval: Duration,
-    #[serde(with = "humantime_serde", default)]
+    #[serde(
+        with = "jiff::fmt::serde::unsigned_duration::friendly::compact::required",
+        default
+    )]
     query_timeout: Duration,
-    #[serde(with = "humantime_serde", default)]
+    #[serde(
+        with = "jiff::fmt::serde::unsigned_duration::friendly::compact::required",
+        default
+    )]
     pub backoff_interval: Duration,
-    #[serde(with = "humantime_serde", default)]
+    #[serde(
+        with = "jiff::fmt::serde::unsigned_duration::friendly::compact::required",
+        default
+    )]
     pub max_backoff_interval: Duration,
-    #[serde(with = "humantime_serde", default)]
+    #[serde(
+        with = "jiff::fmt::serde::unsigned_duration::friendly::compact::required",
+        default
+    )]
     metric_expiration_time: Duration,
     metric_prefix: Option<String>,
     #[serde(skip)]
@@ -148,11 +178,20 @@ pub struct ScrapeConfigQuery {
     pub metric_name: String,
     pub description: Option<String>,
     metric_prefix: Option<String>,
-    #[serde(with = "humantime_serde", default)]
+    #[serde(
+        with = "jiff::fmt::serde::unsigned_duration::friendly::compact::required",
+        default
+    )]
     pub scrape_interval: Duration,
-    #[serde(with = "humantime_serde", default)]
+    #[serde(
+        with = "jiff::fmt::serde::unsigned_duration::friendly::compact::required",
+        default
+    )]
     pub query_timeout: Duration,
-    #[serde(with = "humantime_serde", default)]
+    #[serde(
+        with = "jiff::fmt::serde::unsigned_duration::friendly::compact::required",
+        default
+    )]
     pub metric_expiration_time: Duration,
     #[serde(default)]
     pub const_labels: Option<BTreeMap<String, String>>,

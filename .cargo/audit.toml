@@ -1,0 +1,9 @@
+[advisories]
+ignore = [
+    # `astral-tokio-tar` is unmaintained, no safe upgrade available.
+    # Dev-only dependency pulled in by `testcontainers`, not shipped in the binary.
+    "RUSTSEC-2026-0440",
+    # `chrono` is unmaintained.
+    # Dev-only dependency pulled in by `testcontainers` -> `serde_with`, not shipped in the binary.
+    "RUSTSEC-2026-0543",
+]
