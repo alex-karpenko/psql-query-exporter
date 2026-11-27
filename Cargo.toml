@@ -1,6 +1,6 @@
 [package]
 name = "psql-query-exporter"
-version = "0.3.8"
+version = "0.3.9"
 edition = "2024"
 authors = ["Oleksii Karpenko <alexkarpenko@yahoo.com>"]
 description = "PostgreSQL Query Prometheus exporter"
@@ -13,7 +13,7 @@ axum = { version = "0.8.9", default-features = false, features = ["tokio", "http
 clap = { version = "4.6.7", features = ["derive"] }
 envsubst = "0.2.1"
 human-repr = "1.1.0"
-humantime-serde = "1.1.1"
+jiff = { version = "1.0.3", features = ["serde"] }
 openssl = "0.10.81"
 openssl-sys = "0.9.117"
 postgres-openssl = "0.5.3"
@@ -30,5 +30,5 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 dtor = "1.0.6"
 insta = { version = "1.49.0", features = ["yaml"] }
 reqwest = { version = "0.13.5", default-features = false }
-rstest = "0.28.0"
+rstest = "0.29.0"
 testcontainers = { version = "0.28.0", features = ["blocking"] }

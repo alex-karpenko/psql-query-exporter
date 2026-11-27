@@ -137,6 +137,16 @@ target/release/psql-query-exporter --config ./config.yaml -v
 
 Configuration file has two sections: optional `defaults` and mandatory `sources`.
 
+### Duration values
+
+All interval/timeout/expiration parameters accept durations in a human-friendly format, like `30s`, `5m`, `1h`, `1h 30m`, or `300s`.
+ISO 8601 durations (for example, `PT30S`) are accepted as well.
+
+> [!NOTE]
+> Calendar units like days and weeks (`1d`, `2w`) are **not** supported because their length isn't fixed.
+> Use hours instead, for example, `24h` instead of `1d`.
+> Earlier versions of the exporter accepted these units, so please update your config if you used them.
+
 ### Defaults
 
 `defaults` intended to describe config-wide defaults, all values from this section will be applied to all sources/databases/queries from the `sources` section if the particular value isn't overridden in the corresponding section (if applicable).

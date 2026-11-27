@@ -7,7 +7,14 @@ no-default-features = false
 db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
 yanked = "deny"
-ignore = []
+ignore = [
+    # `astral-tokio-tar` is unmaintained, no safe upgrade available.
+    # Dev-only dependency pulled in by `testcontainers`, not shipped in the binary.
+    { id = "RUSTSEC-2026-0440", reason = "dev-only via testcontainers, no upgrade available" },
+    # `chrono` is unmaintained.
+    # Dev-only dependency pulled in by `testcontainers` -> `serde_with`, not shipped in the binary.
+    { id = "RUSTSEC-2026-0543", reason = "dev-only via testcontainers, no upgrade available" },
+]
 
 [licenses]
 allow = ["MIT", "Apache-2.0", "Unicode-3.0", "BSD-3-Clause"]
