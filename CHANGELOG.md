@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.9] - 2026-11-27
+### Details
+#### Fixed
+- Replace unmaintained humantime-serde with jiff, update dependencies and CI actions by @alex-karpenko in [#79](https://github.com/alex-karpenko/psql-query-exporter/pull/79)
+
 ## [0.3.8] - 2026-10-23
 ### Details
 #### Fixed
@@ -282,6 +287,7 @@ All notable changes to this project will be documented in this file.
 
 * @oleksii-karpenko-rri made their first contribution
 
+[0.3.9]: https://github.com/alex-karpenko/psql-query-exporter/compare/v0.3.8..v0.3.9
 [0.3.8]: https://github.com/alex-karpenko/psql-query-exporter/compare/v0.3.7..v0.3.8
 [0.3.7]: https://github.com/alex-karpenko/psql-query-exporter/compare/v0.3.6..v0.3.7
 [0.3.6]: https://github.com/alex-karpenko/psql-query-exporter/compare/v0.3.5..v0.3.6
