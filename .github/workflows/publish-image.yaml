@@ -25,7 +25,7 @@ jobs:
 
       - name: Install cosign
         if: github.event_name != 'pull_request'
-        uses: sigstore/cosign-installer@v4
+        uses: sigstore/cosign-installer@v4.1.4
 
       - name: Setup Docker buildx
         uses: docker/setup-buildx-action@v4
